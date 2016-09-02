@@ -11,8 +11,8 @@ GPUXXFLAGS = -c -v
 # Fuentes
 INCLUDE_DIR = include
 
-SOURCE = ProcessVideoFrames.cpp src/opencv_util.cpp
-SOURCE_CU = segment.cu
+SOURCE = src/ProcessVideoFrames.cpp src/opencv_util.cpp
+SOURCE_CU = cuda/segment.cu
 SOURCES = $(SOURCE_CU) $(SOURCE)
 #OBJECTS = $(SOURCE:.cpp=.o) $(SOURCE_CU:.cu=.o)
 OBJECTS = $(SOURCE_CU:.cu=.o)
@@ -45,6 +45,7 @@ $(EXEC): $(OBJECTS) $(SOURCE)
 
 clean:
 	rm $(OBJECTS) $(EXEC)
+	rm -f cuda/*.o
 
 print:
 	@echo $(SOURCES)
