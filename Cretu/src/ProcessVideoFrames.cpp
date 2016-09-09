@@ -70,9 +70,9 @@ int main(int argc, const char* argv[])
 	cv::cuda::GpuMat d_hsv; // = cv::cuda::GpuMat(d_frame.size(), cv::CV_8UC3);
 	//d_hsv.upload(d_frame);
 	cv::cuda::cvtColor(d_frame, d_hsv, cv::COLOR_BGR2HSV);
-	//cv::imshow("Mod", d_hsv);
+	cv::imshow("Mod", d_hsv);
 
-	//cv::waitKey(0);
+	cv::waitKey(0);
 	
 	int ndiff = 0;
 	for (;;)
