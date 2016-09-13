@@ -22,6 +22,7 @@
 
 // Utility functions
 #include "opencv_util.h"
+#include "GNG.h"
 
 // This function is defined in .cu file
 int gpuSegment(cv::InputArray _img1,
@@ -36,6 +37,20 @@ int main(int argc, const char* argv[])
 	std::cout << "This computer has " << idev << " cuda enabled device(s)." << std::endl;
 	if (idev == 0) return -1;
 
+	// Ask if device is compatible
+	cv::cuda::DeviceInfo dev_info = cv::cuda::DeviceInfo();
+	bool bglcomp = dev_info.isCompatible();
+	std::cout << "This computer's device compatibility with GlDevice is " << bglcomp << std::endl;
+	if (!bglcomp) return -1;
+
+	// Ask dimensions of blocks and threads
+	int numKernels = dev_info.concurrentKernels();
+	std::cout << "There can be " << numKernels << " concurrentKernel(s)" << std::endl;
+	cv::Vec<int, 3> gridSize = dev_info.maxGridSize();
+	std::cout << "Max grid size  " << gridSize << std::endl; // 960: Max grid size  [2147483647, 65535, 65535]
+	cv::Vec<int, 3> blockSize = dev_info.maxThreadsDim();
+	std::cout << "Max threads per block " << blockSize << std::endl; // 960: Max threads per block [1024, 1024, 64]
+
 	if (argc != 2) {
 		std::cerr << "Use: ProcessVideoFrames <video_file>" << std::endl;
 		return -1;
@@ -46,12 +61,6 @@ int main(int argc, const char* argv[])
 	cv::namedWindow("GPU", cv::WINDOW_OPENGL);  cv::moveWindow("GPU", 10, 50);
 	cv::namedWindow("Mod", cv::WINDOW_OPENGL);  cv::moveWindow("Mod", 500, 50);
 	cv::cuda::setGlDevice();
-
-	// Ask if device is compatible
-	cv::cuda::DeviceInfo dev_info = cv::cuda::DeviceInfo();
-	bool bglcomp = dev_info.isCompatible();
-	std::cout << "This computer's device compatibility with GlDevice is " << bglcomp << std::endl;
-	if (!bglcomp) return -1;
 
 	cv::cuda::GpuMat d_frame;
 	cv::Ptr<cv::cudacodec::VideoReader> d_reader = cv::cudacodec::createVideoReader(fname);
@@ -67,10 +76,14 @@ int main(int argc, const char* argv[])
 		exit(1);
 	}
 	// >> Transform to HSV
-	cv::cuda::GpuMat d_hsv; // = cv::cuda::GpuMat(d_frame.size(), cv::CV_8UC3);
-	//d_hsv.upload(d_frame);
+	cv::cuda::GpuMat d_hsv;
 	cv::cuda::cvtColor(d_frame, d_hsv, cv::COLOR_BGR2HSV);
 	cv::imshow("Mod", d_hsv);
+
+	if(segmentFrame(d_hsv) < 0) {
+		std::cerr << "Segmentation of first frame failed." << std::endl;
+		exit(1);
+	}
 
 	cv::waitKey(0);
 	

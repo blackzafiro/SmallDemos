@@ -11,12 +11,18 @@ find_package(OpenCV REQUIRED)
 
 set(INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+
 ### CUDA Kernels
 
 set(CUDAK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
 MESSAGE( ${OpenCV_INCLUDE_DIRS} )
 
-SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3 -gencode arch=compute_20,code=sm_20)
+# Chose gencode arch and code from
+# https://en.wikipedia.org/wiki/CUDA#Supported_GPUs
+SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
+    -O3
+    -gencode arch=compute_52,code=sm_52
+		-gencode arch=compute_20,code=sm_20)
 #add_compile_options(-c -v)
 add_definitions(-D_FORCE_INLINES)
 cuda_include_directories(${OpenCV_INCLUDE_DIRS})
