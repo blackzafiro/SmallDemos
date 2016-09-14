@@ -24,6 +24,23 @@
 #include "opencv_util.h"
 #include "GNG.h"
 
+/**
+ * Calculates a region of interest centered on the image, with the maximum size
+ * for threading.
+ */
+cv::Rect calculateROI(int imageWidth, int imageHeight, int devWidth, int devHeight) {
+	int x(0), y(0), width(imageWidth), height(imageHeight);
+	if (imageWidth > devWidth) {
+		x = (imageWidth - devWidth) / 2;
+		width = devWidth;
+	}
+	if (imageHeight > devHeight) {
+		y = (imageHeight - devHeight) / 2;
+		width = devHeight;
+	}
+	return cv::Rect(x, y, width, height);
+}
+
 // This function is defined in .cu file
 int gpuSegment(cv::InputArray _img1,
                      cv::OutputArray _img2,
@@ -69,15 +86,24 @@ int main(int argc, const char* argv[])
 	cv::cudacodec::FormatInfo formatInfo = d_reader->format();
 	std::cout << formatInfo.width << "x" << formatInfo.height << " codec:" << formatInfo.codec << std::endl;
 
+	int imageWidth = formatInfo.width;
+	int imageHeight = formatInfo.height;
+
 	// >> Read initial frame
 	int nframe = 0;
 	if (!d_reader->nextFrame(d_frame)) {
 		std::cerr << "Could not read first frame" << std::endl;
 		exit(1);
 	}
+	// Get region of interest, according to device capabilites
+	cv::Rect roi = calculateROI(imageWidth, imageHeight, blockSize[0], blockSize[1]);
+	cv::cuda::GpuMat d_roi = cv::cuda::GpuMat(d_frame, roi);
+	//cv::rectangle(d_roi, roi.tl(), roi.br(), cv::Scalar(255), 1, 8, 0);
+
 	// >> Transform to HSV
 	cv::cuda::GpuMat d_hsv;
-	cv::cuda::cvtColor(d_frame, d_hsv, cv::COLOR_BGR2HSV);
+	cv::cuda::cvtColor(d_roi, d_hsv, cv::COLOR_BGR2HSV);
+	cv::imshow("GPU", d_frame);
 	cv::imshow("Mod", d_hsv);
 
 	if(segmentFrame(d_hsv) < 0) {
@@ -86,7 +112,7 @@ int main(int argc, const char* argv[])
 	}
 
 	cv::waitKey(0);
-	
+	/*
 	int ndiff = 0;
 	for (;;)
 	{
@@ -116,7 +142,7 @@ int main(int argc, const char* argv[])
 			break;
 
 	}
-
+	*/
 	return 0;
 }
 
