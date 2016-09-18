@@ -1,9 +1,11 @@
 #include "GNG.h"
+#include <cuda_runtime.h>
 
-/**
- * Uses Fritzke GNG to segment figure and backgroud from given image.
- * Returns a negative number if there was an error.
- */
-int segmentFrame(cv::cuda::GpuMat& d_hsv) {
-	return 0;
+/** Constructor. */
+GNG::SegmentationGNG::SegmentationGNG(HSV2DVector* d_nodes, cv::cuda::GpuMat &connections) :
+	dp_nodes(d_nodes), 
+	dr_connections(connections) {}
+
+GNG::SegmentationGNG::~SegmentationGNG() {
+	if(dp_nodes) cudaFree(dp_nodes);
 }

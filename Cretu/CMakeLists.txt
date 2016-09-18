@@ -20,12 +20,14 @@ MESSAGE( ${OpenCV_INCLUDE_DIRS} )
 # Chose gencode arch and code from
 # https://en.wikipedia.org/wiki/CUDA#Supported_GPUs
 SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
-    -O3
-    -gencode arch=compute_52,code=sm_52
-		-gencode arch=compute_20,code=sm_20)
+	-O3
+	#-gencode arch=compute_52,code=sm_52	#GeForce GTX 960
+	-gencode arch=compute_50,code=sm_50		#GeForce GTX 960M
+	#-gencode arch=compute_20,code=sm_20	#GeForce GT 750
+)
 #add_compile_options(-c -v)
 add_definitions(-D_FORCE_INLINES)
-cuda_include_directories(${OpenCV_INCLUDE_DIRS})
+cuda_include_directories(${OpenCV_INCLUDE_DIRS} ${INC_DIR})
 #cuda_compile(CudaKernel ${CUDAK_DIR}/segment.cu)
 cuda_add_library(CudaKernels ${CUDAK_DIR}/segment.cu)
 add_definitions(-DGPU_OPENCV_ENABLE)

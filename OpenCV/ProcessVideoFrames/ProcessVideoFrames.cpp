@@ -21,7 +21,7 @@
 
 // This function is defined in .cu file
 int gpuNumDifferent(cv::InputArray _img1,
-                     cv::OutputArray _img2,
+                     cv::InputArray _img2,
                      cv::cuda::Stream _stream);
 
 /**

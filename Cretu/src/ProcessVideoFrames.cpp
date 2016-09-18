@@ -42,9 +42,10 @@ cv::Rect calculateROI(int imageWidth, int imageHeight, int devWidth, int devHeig
 }
 
 // This function is defined in .cu file
-int gpuSegment(cv::InputArray _img1,
-                     cv::OutputArray _img2,
-                     cv::cuda::Stream _stream);
+int gpuBuildGngForSegmentation(cv::InputArray _imgHsv,
+					int maxNumNodes,
+                    GNG::SegmentationGNG **gng,
+                    cv::cuda::Stream _stream);
 
 int main(int argc, const char* argv[])
 {
@@ -66,7 +67,7 @@ int main(int argc, const char* argv[])
 	cv::Vec<int, 3> gridSize = dev_info.maxGridSize();
 	std::cout << "Max grid size  " << gridSize << std::endl; // 960: Max grid size  [2147483647, 65535, 65535]
 	cv::Vec<int, 3> blockSize = dev_info.maxThreadsDim();
-	std::cout << "Max threads per block " << blockSize << std::endl; // 960: Max threads per block [1024, 1024, 64]
+	std::cout << "Max threads per block " << dev_info.maxThreadsPerBlock() << "; with block dims: " << blockSize << std::endl; // 960: Max threads per block [1024, 1024, 64]
 
 	if (argc != 2) {
 		std::cerr << "Use: ProcessVideoFrames <video_file>" << std::endl;
@@ -106,12 +107,18 @@ int main(int argc, const char* argv[])
 	cv::imshow("GPU", d_frame);
 	cv::imshow("Mod", d_hsv);
 
-	if(segmentFrame(d_hsv) < 0) {
+	cv::waitKey(0);
+	
+	int maxNumNodes = 800;
+	std::cout << "Generating GNG with a maximum of " << maxNumNodes << " nodes..." << std::endl;
+	GNG::SegmentationGNG* gng = 0;
+	if( gpuBuildGngForSegmentation(d_hsv, maxNumNodes, &gng, cv::cuda::Stream() ) < 0) {
 		std::cerr << "Segmentation of first frame failed." << std::endl;
 		exit(1);
 	}
-
-	cv::waitKey(0);
+	
+	
+	delete gng;
 	/*
 	int ndiff = 0;
 	for (;;)
