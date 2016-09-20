@@ -97,7 +97,7 @@ if __name__ == '__main__':
                 pickle.dump(gng, f)
     hsv_mean = gng.calculate_foreground_mean()
     gng.show()
-    gng.plotHSV()
+    gng.plotHSV(with_edges = True)
     
     if cv2.waitKey() & 0xFF == ord('q'):
         sys.exit(0)

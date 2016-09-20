@@ -250,16 +250,23 @@ class SegmentationGNG:
     def show(self):
         """ Shows an image with x, y pixel on the hsv selected color. """
         img = np.zeros(self.imageShape, np.uint8)
-        print("show: There are ", len(self.nodes.keys()), " nodes in GNG")
+        print("show: There are ", len(self.nodes), " nodes in GNG")
         
-        for k in self.nodes.keys():
-            img[int(k[4]), int(k[3])] = np.array(k[:3]).astype(int)
+        #for k in self.nodes.keys():
+        #    img[int(k[4]), int(k[3])] = np.array(k[:3]).astype(int)
+        for k, s_data in self.nodes.items():
+            s = np.array(k).astype(int)
+            img[s[4], s[3]] = s[:3]
+            for edge in s_data.edges:
+                q = np.array(edge[0]).astype(int)
+                color = np.array(k[:3])
+                cv2.line(img, tuple(s[3:]), tuple(q[3:]), color)
             
         cv2.imshow('gng', img)
         cv2.moveWindow('gng', self.imageShape[1], 0)
         cv2.waitKey(1)
         
-    def plotHSV(self):
+    def plotHSV(self, with_edges = False):
         """ Plots hsv values of nodes in GNG. """
         nodes_list = list(self.nodes.keys())
         nodes = np.array(nodes_list)
@@ -274,7 +281,16 @@ class SegmentationGNG:
             show = True
         else:
             plt.cla()
-            
+
+        ax = self.ax
+        if with_edges:
+            # Plot edges
+            for s, s_data in self.nodes.items():
+                for edge in s_data.edges:
+                    q = edge[0]
+                    ax.plot((s[0], q[0]), (s[1], q[1]), (s[2], q[2]))
+
+        # Color clusters
         foreg = []
         for no in nodes_list:
             # Add color and marker
@@ -286,11 +302,12 @@ class SegmentationGNG:
         nodes = np.hstack((nodes, foreg))
         nodes_p = nodes[nodes[:,-1] == 1]
         nodes_n = nodes[nodes[:,-1] == 0]
-        self.ax.scatter(nodes_p[:,0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o')
-        self.ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^')
-        self.ax.set_xlabel("H")
-        self.ax.set_ylabel("S")
-        self.ax.set_zlabel("V")
+
+        ax.scatter(nodes_p[:,0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o')
+        ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^')
+        ax.set_xlabel("H")
+        ax.set_ylabel("S")
+        ax.set_zlabel("V")
         if show:
             self.fig.show()
         else:
