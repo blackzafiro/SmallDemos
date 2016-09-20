@@ -38,6 +38,7 @@ class SegmentationNodeData:
         """
         self.local_error = 0
         self.edges = []
+        self.in_foreground = False
         
     def add_edge_with(self, node):
         """ Adds an edge between self and node. """
@@ -260,7 +261,8 @@ class SegmentationGNG:
         
     def plotHSV(self):
         """ Plots hsv values of nodes in GNG. """
-        nodes = np.array(list(self.nodes.keys()))
+        nodes_list = list(self.nodes.keys())
+        nodes = np.array(nodes_list)
         show = False
         if not hasattr(self, 'fig'):
             fig = plt.figure()
@@ -272,7 +274,20 @@ class SegmentationGNG:
             show = True
         else:
             plt.cla()
-        self.ax.scatter(nodes[:,0], nodes[:,1], nodes[:,2])
+            
+        foreg = []
+        for no in nodes_list:
+            # Add color and marker
+            if self.nodes[no].in_foreground:
+                foreg.append([1])
+            else:
+                foreg.append([0])
+        foreg = np.array(foreg)
+        nodes = np.hstack((nodes, foreg))
+        nodes_p = nodes[nodes[:,-1] == 1]
+        nodes_n = nodes[nodes[:,-1] == 0]
+        self.ax.scatter(nodes_p[:,0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o')
+        self.ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^')
         self.ax.set_xlabel("H")
         self.ax.set_ylabel("S")
         self.ax.set_zlabel("V")
@@ -280,7 +295,34 @@ class SegmentationGNG:
             self.fig.show()
         else:
             self.fig.canvas.draw()
+            
+    def calculate_foreground_mean(self):
+        """ Takes the mean of all hsv components of nodes,
+        to divide them in foreground and background, as suggested
+        by "Deformable Object Segmentation and Contour Tracking
+        in Image Sequences Using Unsupervised Networks"
+        by Cretu et. al. 2010
         
+        After splitting, calculates the mean of the lighter cluster.
+        """
+        mean = np.array([0,0,0], dtype = np.float64)
+        for node in self.nodes.keys():
+            mean += np.array(node[0:3])
+        mean = mean / (3 * len(self.nodes))
+        # Mean HSV value?
+        mean = np.sum(mean) / len(mean)
+        
+        mean_foreground = np.array([0,0,0], dtype = np.float64)
+        for node in self.nodes.keys():
+            array = np.array(node[0:3])
+            mu = np.sum(array) / 3
+            if mu > mean:
+                self.nodes[node].in_foreground = True
+                mean_foreground += array
+            else:
+                self.nodes[node].in_foreground = False
+        mean_foreground /= (3 * len(self.nodes))
+        return mean_foreground
     
 class ErrorPlot:
     def __init__(self):

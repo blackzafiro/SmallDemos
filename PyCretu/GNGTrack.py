@@ -95,10 +95,9 @@ if __name__ == '__main__':
         if param_suit:
             with open(param_suit['file_segment_gng'], 'wb') as f:
                 pickle.dump(gng, f)
+    hsv_mean = gng.calculate_foreground_mean()
     gng.show()
     gng.plotHSV()
-    
-    
     
     if cv2.waitKey() & 0xFF == ord('q'):
         sys.exit(0)
