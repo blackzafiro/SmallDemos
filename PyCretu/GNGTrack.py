@@ -7,12 +7,16 @@ sys.path.append(OPENCV_HOME + '/lib/python3.5/dist-packages')
 
 from pathlib import Path
 import time
-
-import numpy as np
-import cv2
-
-import GNG
 import pickle
+
+import cv2
+import numpy as np
+
+# http://scikit-learn.org/stable/install.html
+# sudo -H pip3 install -U scikit-learn
+from sklearn import cluster
+import GNG
+
 
 segment_params = {'max_age' : 40,
                   'lambda_steps' : 1000,
@@ -40,11 +44,11 @@ if __name__ == '__main__':
     else:
         print('Usage: ' + sys.argv[0] + ' <video_file_name>')
         sys.exit(1)
-    
+
     #
     # Process first frame
     #
-    
+
     ret, frame = None, None
     if cap.isOpened():
         ret, frame = cap.read()
@@ -54,16 +58,16 @@ if __name__ == '__main__':
     else:
         print("Failed to capture source")
         sys.exit(1)
-        
+
     if param_suit:
         roi_coords = param_suit['roi']
         small_frame = frame[roi_coords[0][1]:roi_coords[1][1], roi_coords[0][0]:roi_coords[1][0]]
     else:
         small_frame = frame
-    
+
     small_frame = cv2.resize(small_frame, None, fx = 0.5, fy = 0.5, interpolation = cv2.INTER_AREA)
     hsv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2HSV)
-    
+
     if param_suit:
         roi_coords = param_suit['roi']
         cv2.rectangle(frame, roi_coords[0], roi_coords[1], 255)
@@ -72,13 +76,13 @@ if __name__ == '__main__':
             sys.exit(0)
         else:
             cv2.destroyWindow('Source')
-    
+
     # Display hsv frame
     cv2.imshow('hsv', hsv)
     cv2.moveWindow('hsv', 0, 0)
     if cv2.waitKey() & 0xFF == ord('q'):
         sys.exit(0)
-        
+
     # Get GNG for segmentation
     gng = None
     if param_suit:
@@ -98,10 +102,15 @@ if __name__ == '__main__':
     hsv_mean = gng.calculate_foreground_mean()
     gng.show()
     gng.plotHSV(with_edges = True)
-    
+
+    # Use K-Means to separate foreground from background
+    observations = np.array(list(gng.nodes.keys()))
+    centroid, label, inertia = cluster.k_means(observations, 2)
+    print("Centroides:\n", centroid)
+
     if cv2.waitKey() & 0xFF == ord('q'):
         sys.exit(0)
-      
+
     #while(cap.isOpened()):
         ## Capture frame-by-frame
         #ret, frame = cap.read()

@@ -1,7 +1,6 @@
 import random
 import cv2
 import numpy as np
-import math
 from operator import add, sub, mul
 
 #sudo apt install python3-tk
