@@ -45,26 +45,21 @@ def extract_foreground(gng, get_hsv=False):
     observations = np.array(list(gng.nodes.keys()))
     centroids, labels, inertia = cluster.k_means(observations, 2)
     print("Centroides:\n", centroids)
+
+    # The centroids given by k-means correspond to the mean of all elements in the cluster
+    # for each dimension
     #print("Etiquetas:\n", labels)
+
+    # Put centroid with greatest value in positon zero (foreground candidate)
+    if centroids[0][2] < centroids[1][2]:
+        temp = np.copy(centroids[0])
+        centroids[0] = centroids[1]
+        centroids[1] = temp
+
     if get_hsv:
-        hsv1 = np.zeros(3)
-        hsv2 = np.zeros(3)
-        len1 = 0
-        len2 = 0
-        for key, label in zip(observations, labels):
-            n_data = gng.nodes[tuple(key)]
-            if label == 1:
-                hsv1 += key[0:3]
-                len1 += 1
-            else:
-                hsv2 += key[0:3]
-                len2 += 1
-        hsv1 /= len1
-        hsv2 /= len2
-        if hsv1[2] < hsv2[2]:
-            hsv1, hsv2 = hsv2, hsv1
-        centroids = (hsv1, hsv2)
-        print("HSV centroids", centroids)
+        # Use only hsv coordinates and ignore position
+        centroids = centroids[:,0:3]
+        #print(centroids)
         for node, n_data in gng.nodes.items():
             dist0 = np.linalg.norm(node[0:3] - centroids[0])
             dist1 = np.linalg.norm(node[0:3] - centroids[1])
@@ -74,8 +69,6 @@ def extract_foreground(gng, get_hsv=False):
                 n_data.in_foreground = False
             #print(node, n_data.in_foreground)
     else:
-        if centroids[0][2] < centroids[1][2]:
-            centroids[0], centroids[1] = centroids[1], centroids[0]
         for key, label in zip(observations, labels):
             n_data = gng.nodes[tuple(key)]
             if label == 1:
@@ -197,6 +190,10 @@ if __name__ == '__main__':
     # Use K-Means to separate foreground from background
     dst = np.zeros((hsv.shape[0], hsv.shape[1]), dtype=np.uint8)
 
+    # It doesn't work if we use the positional information as well :P
+    #kcentroids = extract_foreground(gng, False)
+    #background_foreground_from_kmeans(hsv, dst, kcentroids)
+
     hsv_centroids = extract_foreground(gng, True)
     background_foreground_from_hsv(hsv, dst, hsv_centroids)
 
@@ -209,8 +206,8 @@ if __name__ == '__main__':
     cv2.moveWindow('Median filtered', dst.shape[1], 400)
 
     # Use sobel edge detection
-    sobelx = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 1, 0, ksize=3))
-    sobely = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 0, 1, ksize=3))
+    sobelx = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 1, 0, ksize=1))
+    sobely = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 0, 1, ksize=1))
     sobel = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
     cv2.imshow('Sobel', sobel)
     cv2.moveWindow('Sobel', 2 * dst.shape[1], 400)
