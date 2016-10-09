@@ -3,13 +3,12 @@ import cv2
 import numpy as np
 from operator import add, sub, mul
 
-#sudo apt install python3-tk
+#sudo apt install python3-pyqt4
 #sudo pip3 uninstall matplotlib
 #sudo pip3 install matplotlib --no-binary :all: --no-cache-dir
 
 import matplotlib
-matplotlib.use('TkAgg')
-from mpl_toolkits.mplot3d import Axes3D
+matplotlib.use('Qt4Agg')
 from matplotlib import pyplot as plt
 
 class OpenCVProgressBar:
@@ -274,7 +273,8 @@ class SegmentationGNG:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
             thismanager = plt.get_current_fig_manager()
-            thismanager.window.wm_geometry("+0+" + str(self.imageShape[0]))
+            #thismanager.window.wm_geometry("+0+" + str(self.imageShape[0]))
+            #thismanager.window.setGeometry(0, self.imageShape[0])
             self.fig = fig
             self.ax = ax
             show = True
@@ -302,8 +302,8 @@ class SegmentationGNG:
         nodes_p = nodes[nodes[:,-1] == 1]
         nodes_n = nodes[nodes[:,-1] == 0]
 
-        ax.scatter(nodes_p[:,0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o')
-        ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^')
+        ax.scatter(nodes_p[:, 0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o', s=20)
+        ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^', s=20)
         ax.set_xlabel("H")
         ax.set_ylabel("S")
         ax.set_zlabel("V")
@@ -311,40 +311,13 @@ class SegmentationGNG:
             self.fig.show()
         else:
             self.fig.canvas.draw()
-            
-    def calculate_foreground_mean(self):
-        """ Takes the mean of all hsv components of nodes,
-        to divide them in foreground and background, as suggested
-        by "Deformable Object Segmentation and Contour Tracking
-        in Image Sequences Using Unsupervised Networks"
-        by Cretu et. al. 2010
-        
-        After splitting, calculates the mean of the lighter cluster.
-        """
-        mean = np.array([0,0,0], dtype = np.float64)
-        for node in self.nodes.keys():
-            mean += np.array(node[0:3])
-        mean = mean / (3 * len(self.nodes))
-        # Mean HSV value?
-        mean = np.sum(mean) / len(mean)
-        
-        mean_foreground = np.array([0,0,0], dtype = np.float64)
-        for node in self.nodes.keys():
-            array = np.array(node[0:3])
-            mu = np.sum(array) / 3
-            if mu > mean:
-                self.nodes[node].in_foreground = True
-                mean_foreground += array
-            else:
-                self.nodes[node].in_foreground = False
-        mean_foreground /= (3 * len(self.nodes))
-        return mean_foreground
+
     
 class ErrorPlot:
     def __init__(self):
         self.fig, self.ax = plt.subplots()
-        thismanager = plt.get_current_fig_manager()
-        thismanager.window.wm_geometry("+600+0")
+        #thismanager = plt.get_current_fig_manager()
+        #thismanager.window.wm_geometry("+600+0")
         self.ax.set_ylabel("Total accumulated error")
         self.fig.show()
         
