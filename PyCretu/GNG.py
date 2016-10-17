@@ -8,6 +8,7 @@ from operator import add, sub, mul
 #sudo pip3 install matplotlib --no-binary :all: --no-cache-dir
 
 import matplotlib
+from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('Qt4Agg')
 from matplotlib import pyplot as plt
 
@@ -29,14 +30,15 @@ class OpenCVProgressBar:
     def close(self):
         cv2.destroyWindow('progress_bar')
 
-class SegmentationNodeData:
+
+class GNGNodeData(object):
+    """ General information about each GNG node. """
     def __init__(self):
         """ initialized with an empty list of edges.
         Edges are of the form [s, age] and zero local error.
         """
         self.local_error = 0
         self.edges = []
-        self.in_foreground = False
         
     def add_edge_with(self, node):
         """ Adds an edge between self and node. """
@@ -59,18 +61,19 @@ class SegmentationNodeData:
             if edge[0] == other_node:
                 return edge
         return None
-        
-class SegmentationGNG:
-    def __init__(self, imageShape, max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta):
+
+
+class GNG(object):
+    def __init__(self, max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta):
         """ Receives the shape of the image that will be segmented. """
         self.nodes = {}
-        self.imageShape = imageShape
         self.max_age = max_age
         self.lambda_steps = lambda_steps
         self.epsilon_beta = epsilon_beta
         self.epsilon_eta = epsilon_eta
         self.alfa = alfa
         self.beta = beta
+        self.create_node_data = GNGNodeData
         
     def add_node(self, node):
         """ Receives tuple [H,S,V,x,y]
@@ -78,7 +81,7 @@ class SegmentationGNG:
         Returns whether the GNG changed as a result
         """
         if node not in self.nodes.keys():
-            self.nodes[node] = SegmentationNodeData()
+            self.nodes[node] = self.create_node_data()
             return True
         else:
             return False
@@ -244,13 +247,28 @@ class SegmentationGNG:
             s_data.local_error *= comp_beta 
             total_error += s_data.local_error
         return total_error
-        
+
+
+class SegmentationNodeData(GNGNodeData):
+    def __init__(self):
+        super(SegmentationNodeData, self).__init__()
+        self.in_foreground = False
+
+
+class SegmentationGNG(GNG):
+    """ GNG used to caracterize clusters in image by HSV,xy info. """
+
+    def __init__(self, imageShape, max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta):
+        super(SegmentationGNG, self).__init__(max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta)
+        self.create_node_data = SegmentationNodeData
+        self.imageShape = imageShape
+
     def show(self):
         """ Shows an image with x, y pixel on the hsv selected color. """
         img = np.zeros(self.imageShape, np.uint8)
         print("show: There are ", len(self.nodes), " nodes in GNG")
-        
-        #for k in self.nodes.keys():
+
+        # for k in self.nodes.keys():
         #    img[int(k[4]), int(k[3])] = np.array(k[:3]).astype(int)
         for k, s_data in self.nodes.items():
             s = np.array(k).astype(int)
@@ -259,11 +277,11 @@ class SegmentationGNG:
                 q = np.array(edge[0]).astype(int)
                 color = np.array(k[:3])
                 cv2.line(img, tuple(s[3:]), tuple(q[3:]), color)
-            
+
         cv2.imshow('gng', img)
         cv2.moveWindow('gng', self.imageShape[1], 0)
         cv2.waitKey(1)
-        
+
     def plotHSV(self, with_edges = False):
         """ Plots hsv values of nodes in GNG. """
         nodes_list = list(self.nodes.keys())
@@ -312,13 +330,14 @@ class SegmentationGNG:
         else:
             self.fig.canvas.draw()
 
-    
+
 class ErrorPlot:
     def __init__(self):
         self.fig, self.ax = plt.subplots()
         #thismanager = plt.get_current_fig_manager()
         #thismanager.window.wm_geometry("+600+0")
         self.ax.set_ylabel("Total accumulated error")
+        self.ax.set_xlabel("Steps")
         self.fig.show()
         
     def plot(self, errors):

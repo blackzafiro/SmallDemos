@@ -83,6 +83,41 @@ def extract_foreground(gng, get_hsv=False):
     return centroids
 
 
+def extract_material_finger_background(gng):
+    """ Separate foreground and background using k-means and value.
+    It returns the k-means centroids with hsv, the centroid
+    with biggest value in position zero.
+    """
+    observations = np.array(list(gng.nodes.keys()))
+    kmeans = cluster.KMeans(n_clusters=3).fit(observations)
+    print("Centroides:\n", kmeans.cluster_centers_)
+
+    # Put centroid with greatest value in positon zero (foreground candidate)
+    indexes_sorted = kmeans.cluster_centers_[:,2].argsort()
+    kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
+    kmeans.labels_ = kmeans.labels_[indexes_sorted]
+    kmeans.inertia_ = kmeans.inertia_[indexes_sorted]
+
+    # TODO:
+    # Use only hsv coordinates and ignore position
+    centroids = centroids[:,0:3]
+    #print(centroids)
+    for node, n_data in gng.nodes.items():
+        dist0 = np.linalg.norm(node[0:3] - centroids[0])
+        dist1 = np.linalg.norm(node[0:3] - centroids[1])
+        if dist0 < dist1:
+            n_data.in_foreground = True
+        else:
+            n_data.in_foreground = False
+        #print(node, n_data.in_foreground)
+
+    gng.plotHSV(with_edges=True)
+    gng.ax.scatter(centroids[0][0], centroids[0][1], centroids[0][2], c='r', marker='d', s=100)
+    gng.ax.scatter(centroids[1][0], centroids[1][1], centroids[1][2], c='b', marker='s', s=100)
+    gng.fig.canvas.draw()
+    return centroids
+
+
 def background_foreground_from_hsv(src, dst, hsv_centroids):
     """ Uses the hsv coordinates of the centroids to mark each pixel in dst as
     foreground or background
