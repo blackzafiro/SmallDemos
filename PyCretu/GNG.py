@@ -1,4 +1,5 @@
 import random
+import itertools
 import cv2
 import numpy as np
 from operator import add, sub, mul
@@ -11,6 +12,7 @@ import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('Qt4Agg')
 from matplotlib import pyplot as plt
+import matplotlib.cm as cm
 
 class OpenCVProgressBar:
     def __init__(self):
@@ -279,10 +281,10 @@ class SegmentationGNG(GNG):
                 cv2.line(img, tuple(s[3:]), tuple(q[3:]), color)
 
         cv2.imshow('gng', img)
-        cv2.moveWindow('gng', self.imageShape[1], 0)
+        cv2.moveWindow('gng', 2*self.imageShape[1], 0)
         cv2.waitKey(1)
 
-    def plotHSV(self, with_edges = False):
+    def plotNetColorNodes(self, with_edges = False):
         """ Plots hsv values of nodes in GNG. """
         nodes_list = list(self.nodes.keys())
         nodes = np.array(nodes_list)
@@ -308,23 +310,40 @@ class SegmentationGNG(GNG):
                     ax.plot((s[0], q[0]), (s[1], q[1]), (s[2], q[2]))
 
         # Color clusters
-        foreg = []
-        for no in nodes_list:
-            # Add color and marker
-            if self.nodes[no].in_foreground:
-                foreg.append([1])
-            else:
-                foreg.append([0])
-        foreg = np.array(foreg)
-        nodes = np.hstack((nodes, foreg))
-        nodes_p = nodes[nodes[:,-1] == 1]
-        nodes_n = nodes[nodes[:,-1] == 0]
+        if hasattr(self, 'num_clusters'):
+            colors = cm.rainbow(np.linspace(0, 1, self.num_clusters))
+            markers = itertools.cycle(['o', '^', '*', 's'])
+            cluster_style = np.zeros((len(nodes), 5))
+            for i, node in enumerate(nodes_list):
+                label = self.nodes[node].label
+                cluster_style[i][:-1] = colors[label]
+                cluster_style[i][-1] = label
+            #nodes = np.hstack((nodes, cluster_style))
+            for i in range(0, self.num_clusters):
+                indices = cluster_style[:,-1] == i
+                nodes_i = nodes[indices]
+                style = cluster_style[indices]
+                ax.scatter(nodes_i[:, 0], nodes_i[:, 1], nodes_i[:, 2],
+                           c=style[:,0:-1], marker=next(markers), s=40)
+        else:
+            foreg = []
+            for no in nodes_list:
+                # Add color and marker
+                if self.nodes[no].in_foreground:
+                    foreg.append([1])
+                else:
+                    foreg.append([0])
+            foreg = np.array(foreg)
+            nodes = np.hstack((nodes, foreg))
+            nodes_p = nodes[nodes[:,-1] == 1]
+            nodes_n = nodes[nodes[:,-1] == 0]
 
-        ax.scatter(nodes_p[:, 0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o', s=20)
-        ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^', s=20)
-        ax.set_xlabel("H")
-        ax.set_ylabel("S")
-        ax.set_zlabel("V")
+            ax.scatter(nodes_p[:, 0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o', s=20)
+            ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^', s=20)
+
+        ax.set_xlabel("Channel 1")
+        ax.set_ylabel("Channel 2")
+        ax.set_zlabel("Channel 3")
         if show:
             self.fig.show()
         else:
@@ -391,7 +410,7 @@ def calibrateSegmentationGNG(hsv, segment_params):
                 if step % lambda_steps  == 0:
                     gng.insert_node()
             if y % 20 == 0:
-                gng.plotHSV()
+                gng.plotNetColorNodes()
                 gng.show()
                 error_plot.plot(errors)
             pbar.set_progress(step/last_step)
