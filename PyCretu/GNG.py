@@ -1,6 +1,7 @@
 import random
 import itertools
 import cv2
+import math
 import numpy as np
 from operator import add, sub, mul
 
@@ -13,6 +14,10 @@ from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('Qt4Agg')
 from matplotlib import pyplot as plt
 import matplotlib.cm as cm
+
+# http://scikit-learn.org/stable/install.html
+# sudo -H pip3 install -U scikit-learn
+from sklearn import cluster
 
 class OpenCVProgressBar:
     def __init__(self):
@@ -254,7 +259,7 @@ class GNG(object):
 class SegmentationNodeData(GNGNodeData):
     def __init__(self):
         super(SegmentationNodeData, self).__init__()
-        self.in_foreground = False
+        self.label = 0
 
 
 class SegmentationGNG(GNG):
@@ -264,6 +269,71 @@ class SegmentationGNG(GNG):
         super(SegmentationGNG, self).__init__(max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta)
         self.create_node_data = SegmentationNodeData
         self.imageShape = imageShape
+
+    def extract_clusters(self, num_clusters=3, channel_index=1):
+        """ Separate num_clusters using k-means and value.
+        It returns the k-means centroids with the color scheme values,
+        it sorts the centroids according to the value in channel_index, with the highest located position zero.
+        Sets attribute kmeans as an indicator of the calibration
+        :param num_clusters: Number of classes to identify (each class should be a target object or background.
+        :param channel_index: Index of channel that will be used for classification
+        :return: None, it just calculates and assigns trained KMeans class instance
+        """
+        observations = np.array(list(self.nodes.keys()))[:, [channel_index]]
+        # print(observations)
+        kmeans = cluster.KMeans(n_clusters=num_clusters).fit(observations)
+        # print("Centroids:\n", kmeans.cluster_centers_, '\nLabels:\n', kmeans.labels_)
+
+        # Put centroid with greatest value in positon zero
+        # (background candidate will be last)
+        indexes_sorted = kmeans.cluster_centers_[:, 0].argsort()
+        kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
+        kmeans.labels_ = kmeans.predict(observations)
+
+        #
+        centroids = kmeans.cluster_centers_
+        # print("Sorted by channel " + str(channel_index) + ":\n", centroids, '\n', kmeans.labels_)
+        for node, n_data in self.nodes.items():
+            label = kmeans.predict(((node[channel_index],),))[0]
+            n_data.label = label
+
+        self.plotNetColorNodes(with_edges=True)
+        colors = cm.rainbow(np.linspace(0, 1, len(centroids)))
+        for centroid in centroids:
+            coords = np.zeros(3)
+            coords[channel_index] = centroid
+            label = kmeans.predict((centroid,))[0]
+            self.ax.scatter(coords[0], coords[1], coords[2], c=colors[label], marker='d', s=100)
+        self.fig.canvas.draw()
+
+        self.channel_index = channel_index
+        self.kmeans = kmeans
+
+        num_classes = len(kmeans.cluster_centers_)
+        step = math.ceil(255 / (num_classes - 1))
+        vals = np.min(np.array((np.ceil(np.arange(num_classes) * step),
+                                np.ones(num_classes) * 255)),
+                      0)
+        self.gray_codes = vals
+
+    def segment_image(self, src, dst):
+        """
+        Segments the image in as many clusters as kmeans_class has and
+        paints every cluster in a different shade of gray.
+        :param src: hsv image
+        :param dst: gray scale segmented image
+        """
+        assert hasattr(self, 'kmeans')
+        kmeans_class = self.kmeans
+        channel_index = self.channel_index
+        vals = self.gray_codes
+
+        rows, cols = src.shape[0], src.shape[1]
+        for i in range(rows):
+            for j in range(cols):
+                dst[i, j] = vals[kmeans_class.predict(((src[i, j, channel_index],),))[0]]
+
+
 
     def show(self):
         """ Shows an image with x, y pixel on the hsv selected color. """
@@ -310,36 +380,23 @@ class SegmentationGNG(GNG):
                     ax.plot((s[0], q[0]), (s[1], q[1]), (s[2], q[2]))
 
         # Color clusters
-        if hasattr(self, 'num_clusters'):
-            colors = cm.rainbow(np.linspace(0, 1, self.num_clusters))
+        if hasattr(self, 'kmeans'):
+            num_clusters = len(self.kmeans.cluster_centers_)
+            colors = cm.rainbow(np.linspace(0, 1, num_clusters))
             markers = itertools.cycle(['o', '^', '*', 's'])
             cluster_style = np.zeros((len(nodes), 5))
             for i, node in enumerate(nodes_list):
                 label = self.nodes[node].label
                 cluster_style[i][:-1] = colors[label]
                 cluster_style[i][-1] = label
-            #nodes = np.hstack((nodes, cluster_style))
-            for i in range(0, self.num_clusters):
+            for i in range(0, num_clusters):
                 indices = cluster_style[:,-1] == i
                 nodes_i = nodes[indices]
                 style = cluster_style[indices]
                 ax.scatter(nodes_i[:, 0], nodes_i[:, 1], nodes_i[:, 2],
                            c=style[:,0:-1], marker=next(markers), s=40)
         else:
-            foreg = []
-            for no in nodes_list:
-                # Add color and marker
-                if self.nodes[no].in_foreground:
-                    foreg.append([1])
-                else:
-                    foreg.append([0])
-            foreg = np.array(foreg)
-            nodes = np.hstack((nodes, foreg))
-            nodes_p = nodes[nodes[:,-1] == 1]
-            nodes_n = nodes[nodes[:,-1] == 0]
-
-            ax.scatter(nodes_p[:, 0], nodes_p[:,1], nodes_p[:,2], c='r', marker='o', s=20)
-            ax.scatter(nodes_n[:, 0], nodes_n[:, 1], nodes_n[:, 2], c='b', marker='^', s=20)
+            ax.scatter(nodes[:,0], nodes[:,1], nodes[:,2], c='b', marker='o', s=20)
 
         ax.set_xlabel("Channel 1")
         ax.set_ylabel("Channel 2")
