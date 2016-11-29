@@ -32,9 +32,8 @@ int main(int argc, const char* argv[])
 {
 	// Test if cuda device is present
 
-	int idev = cv::cuda::getCudaEnabledDeviceCount();
-	std::cout << "This computer has " << idev << " cuda enabled device(s)." << std::endl;
-	if (idev == 0) return -1;
+	int code;
+	if(code = verifyCUDACapabilities() < 0) return code;
 
 	if (argc != 2) {
 		std::cerr << "Use: ProcessVideoFrames <video_file>" << std::endl;
@@ -53,6 +52,7 @@ int main(int argc, const char* argv[])
 	std::cout << "This computer's device compatibility with GlDevice is " << bglcomp << std::endl;
 	if (!bglcomp) return -1;
 
+	// Allocate space in device
 	cv::cuda::GpuMat d_frame;
 	cv::Ptr<cv::cudacodec::VideoReader> d_reader = cv::cudacodec::createVideoReader(fname);
 	cv::cuda::GpuMat d_dst;
