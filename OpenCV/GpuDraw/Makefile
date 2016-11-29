@@ -5,21 +5,20 @@ CXX = g++
 CPPFLAGS = -ggdb -fpic -v
 LDFLAGS =
 
-#GPUXX = nvcc
-#GPUXXFLAGS = -c -v
+GPUXX = nvcc
+GPUXXFLAGS = -c -v
 
 # Fuentes
 SOURCE = GpuDraw.cpp
-#SOURCE_CU = imgdiff.cu
-#SOURCES = $(SOURCE_CU) $(SOURCE)
-SOURCES = $(SOURCE)
+SOURCE_CU = gpuDraw.cu
+SOURCES = $(SOURCE_CU) $(SOURCE)
 #OBJECTS = $(SOURCE:.cpp=.o) $(SOURCE_CU:.cu=.o)
-#OBJECTS = $(SOURCE_CU:.cu=.o)
-OBJECTS = $(SOURCE:.cpp=.o)
+OBJECTS = $(SOURCE_CU:.cu=.o)
+#OBJECTS = $(SOURCE:.cpp=.o)
 
 # Ejecutable
 EXEC = GpuDraw
-#OBJ_CU = Diff 
+OBJ_CU = gpuDraw
 
 # OpenCV location
 OPENCV_HOME=/home/blackzafiro/Descargas/Programacion/opencv/opencv-3.1.0/build
@@ -35,13 +34,19 @@ LDFLAGS += `pkg-config --libs opencv` $(CV_LIB) -lcudart
 all: $(SOURCES) $(EXEC)
 
 $(EXEC): $(OBJECTS) $(SOURCE)
+	@echo -e '\e[0;32mGenerating executable...\e[0m'
+#	$(CXX) $(CPPFLAGS) $(SOURCE) -o $@ $(LDFLAGS)
 	$(CXX) $(CPPFLAGS) $(OBJECTS) $(SOURCE) -o $@ $(LDFLAGS)
 
-.cpp.o:
-	$(CXX) $(CPPFLAGS) $< -o $@
+#.cpp.o:
+#	@echo -e '\e[0;32mCompiling objects...\e[0m'
+#	$(CXX) $(CPPFLAGS) $< -o $@
+#	@echo -e '\n'
 
-#%.o: %.cu
-#	$(GPUXX) $(GPUXXFLAGS) $< -o $@ $(LDFLAGS)
+%.o: %.cu
+	@echo -e '\e[0;32mCompiling cuda kernels...\e[0m'
+	$(GPUXX) $(GPUXXFLAGS) $< -o $@ $(LDFLAGS)
+	@echo -e '\n'
 
 clean:
 	rm $(OBJECTS) $(EXEC)
