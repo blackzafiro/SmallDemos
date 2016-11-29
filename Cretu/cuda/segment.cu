@@ -1,6 +1,8 @@
 #include <cuda_runtime.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/core/cuda_stream_accessor.hpp>
+#include "GNG.h"
+#include <math.h>       /* sqrt */
 
 
 // http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
@@ -17,10 +19,13 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 
 // http://stackoverflow.com/questions/24613637/custom-kernel-gpumat-with-float
 
- __global__ void gpuNumDifferentKernel(const cv::cuda::PtrStepSz<uchar4> img1,
-                                cv::cuda::PtrStepSz<uchar4> img2,
-                                int* d_diff)
+ __global__ void gpuNumDifferentKernel(int maxNumNodes,
+								const cv::cuda::PtrStepSz<uchar4> d_img,
+								GNG::HSV2DVector* d_nodes,
+                                const cv::cuda::PtrStepSz<uchar> d_connections
+                                )
 {
+	/*
 	// which thread is this and in which block is it?
 	// These variables won't be used, but they are here for illustrative purposes
 	// http://www.martinpeniak.com/index.php?option=com_content&view=article&catid=17:updates&id=288:cuda-thread-indexing-explained
@@ -29,11 +34,6 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-	/*if(blockIdx.x < 20 && blockIdx.y < 10)
-	printf("Coord (%d, %d) thread(%d, %d, %d) bldim(%d, %d, %d) block(%d, %d, %d) grdim(%d, %d, %d)\n", y, x,
-	       threadIdx.x, threadIdx.y, threadIdx.z, blockDim.x, blockDim.y, blockDim.z,
-	       blockIdx.x, blockIdx.y, blockIdx.z, gridDim.x, gridDim.y, gridDim.z);*/
 
 	__shared__ int sh_diff;
 
@@ -62,41 +62,52 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 	{
 		atomicAdd(d_diff, sh_diff);
 	}
+	*/
 
 }
 
 /**
- * Demo function to illustrate how to create a new kernel for GpuMat,
- * it counts the number of pixels with different value beetween
- * img1 and img2.
+ * It segments the image using growing neural gas.
+ * Receives an image in HSV color space which must fit in a single thread block.
+ * Creates and returns a growing neural gas network on param **gng
  */
-int gpuSegment(cv::InputArray _img1,
-                     cv::OutputArray _img2,
-                     cv::cuda::Stream _stream)
-{
-	const cv::cuda::GpuMat img1 = _img1.getGpuMat();
-	const cv::cuda::GpuMat img2 = _img2.getGpuMat();
-
-	dim3 cthreads_blockDim(32, 32);
+int gpuBuildGngForSegmentation(cv::InputArray _imgHsv,
+					int maxNumNodes,
+                    GNG::SegmentationGNG **gngPointer,
+                    cv::cuda::Stream _stream)
+{	
+	cv::cuda::DeviceInfo dev_info = cv::cuda::DeviceInfo();
+	cv::Vec<int, 3> blockSize = dev_info.maxThreadsDim();
+	
+	
+	const cv::cuda::GpuMat d_img = _imgHsv.getGpuMat();
+	
+	GNG::HSV2DVector h_nodes[maxNumNodes];
+	GNG::HSV2DVector* d_nodes;
+	
+	gpuErrchk( cudaMalloc((void**)&d_nodes, sizeof(GNG::HSV2DVector)) );
+	gpuErrchk( cudaMemcpy((void*)d_nodes, (void*)&h_nodes, sizeof(GNG::HSV2DVector), cudaMemcpyHostToDevice) );
+	
+	cv::cuda::GpuMat d_connections(maxNumNodes, maxNumNodes, CV_8U);
+	
+	GNG::SegmentationGNG* gng = new GNG::SegmentationGNG(d_nodes, d_connections);
+	*gngPointer = gng;
+	
+	int blockSide = (int)sqrt(dev_info.maxThreadsPerBlock());
+	dim3 cthreads_blockDim(blockSide, blockSide);
 	dim3 cblocks_gridDim(
-		static_cast<int>(std::ceil(img1.size().width /
+		static_cast<int>(std::ceil(maxNumNodes /
 		    static_cast<double>(cthreads_blockDim.x))),
-		static_cast<int>(std::ceil(img1.size().height / 
+		static_cast<int>(std::ceil(maxNumNodes / 
 		    static_cast<double>(cthreads_blockDim.y))));
 
-	int h_diff = 0;
-	int *d_diff;
-
-	gpuErrchk( cudaMalloc((void**)&d_diff, sizeof(int)) );
-	gpuErrchk( cudaMemcpy((void*)d_diff, (void*)&h_diff, sizeof(int), cudaMemcpyHostToDevice) );
-
 	cudaStream_t stream = cv::cuda::StreamAccessor::getStream(_stream);
-	gpuNumDifferentKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img1, img2, d_diff);
+	gpuNumDifferentKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(maxNumNodes, d_img, d_nodes, d_connections);
 
 	gpuErrchk( cudaPeekAtLastError() );
 	gpuErrchk( cudaDeviceSynchronize() );
 
-	gpuErrchk( cudaMemcpy((void*)&h_diff, (void*)d_diff, sizeof(int), cudaMemcpyDeviceToHost) );
+	//gpuErrchk( cudaMemcpy((void*)&h_diff, (void*)d_diff, sizeof(int), cudaMemcpyDeviceToHost) );
 
-	return h_diff;
+	return 0;
 }

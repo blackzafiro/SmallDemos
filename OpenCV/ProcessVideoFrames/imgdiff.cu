@@ -71,7 +71,7 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
  * img1 and img2.
  */
 int gpuNumDifferent(cv::InputArray _img1,
-                     cv::OutputArray _img2,
+                     cv::InputArray _img2,
                      cv::cuda::Stream _stream)
 {
 	const cv::cuda::GpuMat img1 = _img1.getGpuMat();
@@ -97,6 +97,7 @@ int gpuNumDifferent(cv::InputArray _img1,
 	gpuErrchk( cudaDeviceSynchronize() );
 
 	gpuErrchk( cudaMemcpy((void*)&h_diff, (void*)d_diff, sizeof(int), cudaMemcpyDeviceToHost) );
+	cudaFree(d_diff);
 
 	return h_diff;
 }
