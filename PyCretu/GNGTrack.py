@@ -33,100 +33,12 @@ vision_params = {'median_kernel_size': 7}
 
 sponge_set_1 = {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_centre_100.mp4',
                 'roi': ((325, 200), (925, 700)),
-                'file_segment_gng': 'luv_segment_gng_scentre.pickle', }
+                'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle', }
 
 
 ## Could try
 ## http://docs.opencv.org/3.1.0/df/d9d/tutorial_py_colorspaces.html
 ## as well
-
-
-
-def extract_material_finger_background(gng, num_clusters=3):
-    """ Separate foreground and background using k-means and value.
-    It returns the k-means centroids with hsv, the centroid
-    with biggest value in position zero.
-    """
-    observations = np.array(list(gng.nodes.keys()))[:,0:3]
-    kmeans = cluster.KMeans(n_clusters=num_clusters).fit(observations)
-    print("Centroids:\n", kmeans.cluster_centers_)
-
-    # Put centroid with greatest value in positon zero (foreground candidate)
-    indexes_sorted = kmeans.cluster_centers_[:,2].argsort()
-    kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
-    kmeans.labels_ = kmeans.labels_[indexes_sorted]
-
-    # TODO:
-    # Use only hsv coordinates and ignore position
-    centroids = kmeans.cluster_centers_
-    print("Sorted by value:\n", centroids)
-    dists = np.zeros(len(centroids))
-    for node, n_data in gng.nodes.items():
-        for i, centroid in enumerate(centroids):
-            dists[i] = np.linalg.norm(node[0:3] - centroid)
-        clase = np.argmax(dists)
-        if clase == 0:
-            n_data.in_foreground = True
-
-        else:
-            n_data.in_foreground = False
-        gng.num_clases = num_clusters
-        n_data.clase = clase
-
-    gng.plotNetColorNodes(with_edges=True)
-    colors = cm.rainbow(np.linspace(0, 1, len(centroids)))
-    for centroid, color in zip(centroids, colors):
-        gng.ax.scatter(centroid[0], centroid[1], centroid[2], c=colors, marker='d', s=100)
-    gng.fig.canvas.draw()
-    return kmeans
-
-
-def material_finger_background_from_hsv(src, dst, kmeans_class):
-    """
-    Segments the image in as many clusters as kmeans_class has and
-    paints every cluster in a different shade of gray.
-    :param src: hsv image
-    :param dst: gray scale segmented image
-    :param kmeans_class: KMeans instance for classification
-    """
-    num_classes = len(kmeans_class.cluster_centers_)
-    step = math.ceil(255 / (num_classes - 1))
-    vals = [min(255, step * i) for i in range(0,4)]
-
-    rows, cols = src.shape[0], src.shape[1]
-    for i in range(rows):
-        for j in range(cols):
-            dst[i,j] = vals[kmeans_class.predict((src[i,j],))[0]]
-
-
-def background_foreground_from_hsv(src, dst, hsv_centroids):
-    """ Uses the hsv coordinates of the centroids to mark each pixel in dst as
-    foreground or background
-    """
-# def background_foreground_from_hsv(src, dst, hsv_centroids, tolerance=(int(0.09*180), int(0.09*255), int(0.02*255))):
-# Using the tolerance failed to associate the center of the sponge with the foreground
-    rows, cols = src.shape[0], src.shape[1]
-    for i in range(rows):
-        for j in range(cols):
-            # Compeating between clusters:
-            dist0 = np.linalg.norm(src[i,j] - hsv_centroids[0])
-            dist1 = np.linalg.norm(src[i,j] - hsv_centroids[1])
-            dst[i,j] = 255 if dist0 < dist1 else 0
-
-            # Using tolerance
-            #print(src[i,j])
-            #dif = tolerance - np.abs(src[i,j] - hsv_centroids[0])
-            #dst[i, j] = 255 if len(dif[dif < 0]) else 0
-
-def background_foreground_from_kmeans(src, dst, kcentroids):
-    rows, cols = src.shape[0], src.shape[1]
-    for i in range(rows):
-        for j in range(cols):
-            node = np.hstack(([i,j], src[i, j]))
-            dist0 = np.linalg.norm(node - kcentroids[0])
-            dist1 = np.linalg.norm(node - kcentroids[1])
-            dst[i, j] = 255 if dist0 < dist1 else 0
-            #print(node, dist0, dist1)
 
 
 ### Using only one color channel
@@ -239,24 +151,21 @@ if __name__ == '__main__':
     # Use K-Means to separate foreground from background
     dst = np.zeros((luv.shape[0], luv.shape[1]), dtype=np.uint8)
 
-    # It doesn't work if we use the positional information as well :P
-    #kcentroids = extract_foreground(gng, False)
-    #background_foreground_from_kmeans(hsv, dst, kcentroids)
-
-    #hsv_centroids = extract_material_finger_background(gng)
-    #hsv_classes = extract_material_finger_background(gng)
     if not hasattr(segmentGNG, 'kmeans'):
         print("Clustering neurons...")
-        segmentGNG.extract_clusters()
+        segmentGNG.extract_clusters(gng_node_indexes=[1])
+        segmentGNG.show()
         with open(param_suit['file_segment_gng'], 'wb') as f:
             pickle.dump(segmentGNG, f)
+    else:
+        segmentGNG.show()
+        segmentGNG.plotNetColorNodes(with_edges=True)
 
-    #if cv2.waitKey() & 0xFF == ord('q'):
-    #    sys.exit(0)
+    print("Press key to segment first image...")
+    if cv2.waitKey() & 0xFF == ord('q'):
+        sys.exit(0)
     print("Segmenting first image...")
-    #material_finger_background_from_hsv(hsv, dst, hsv_classes)
     segmentGNG.segment_image(luv, dst)
-    #background_foreground_from_hsv(hsv, dst, hsv_centroids)
     dst = detect_borders(dst)
 
     print("Press key to start tracking")

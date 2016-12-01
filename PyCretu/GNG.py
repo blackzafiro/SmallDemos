@@ -290,18 +290,23 @@ class SegmentationGNG(GNG):
         kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
         kmeans.labels_ = kmeans.predict(observations)
 
-        #
+        # Assign label to gng nodes
         centroids = kmeans.cluster_centers_
-        # print("Sorted by channel " + str(gng_node_indexes) + ":\n", centroids, '\n', kmeans.labels_)
+        print("Sorted by channel " + str(gng_node_indexes) + ":\n", centroids, '\n', kmeans.labels_)
+
         for node, n_data in self.nodes.items():
-            label = kmeans.predict(((node[[gng_node_indexes]],),))[0]
+            data = np.array(node)[[gng_node_indexes]]
+            label = kmeans.predict((data,))[0]
             n_data.label = label
 
         self.plotNetColorNodes(with_edges=True)
         colors = cm.rainbow(np.linspace(0, 1, len(centroids)))
+        num_characteristics = len(next(iter(self.nodes)))
+        yx_indexes = (num_characteristics - 1, num_characteristics - 2)
+        channel_indexes = list(set(gng_node_indexes) - set(yx_indexes))
         for centroid in centroids:
             coords = np.zeros(3)
-            coords[[gng_node_indexes]] = centroid
+            coords[[channel_indexes]] = centroid
             label = kmeans.predict((centroid,))[0]
             self.ax.scatter(coords[0], coords[1], coords[2], c=colors[label], marker='d', s=100)
         self.fig.canvas.draw()
@@ -324,18 +329,27 @@ class SegmentationGNG(GNG):
         :param dst: gray scale segmented image
         """
         assert hasattr(self, 'kmeans')
+        vals = self.gray_codes
         kmeans_class = self.kmeans
         gng_node_indexes = self.gng_node_indexes
-        x_index = True if len(self.nodes.keys()) - 1 is in gng_node_indexes else False
-        y_index = True if len(self.nodes.keys()) - 2 is in gng_node_indexes else False
-
-        vals = self.gray_codes
+        num_characteristics = len(next(iter(self.nodes)))
+        yx_indexes = (num_characteristics - 1, num_characteristics - 2)
+        channel_indexes = list(set(gng_node_indexes) - set(yx_indexes))
+        # print(yx_indexes, channel_indexes)
 
         rows, cols = src.shape[0], src.shape[1]
-        for i in range(rows):
-            for j in range(cols):
-                keys = (src[i, j, channel_index],)
-                dst[i, j] = vals[kmeans_class.predict((keys,))[0]]
+        if len(channel_indexes) != len(gng_node_indexes):
+            # TODO: what if only y or only x is a feature
+            # y,x are among the features
+            for i in range(rows):
+                for j in range(cols):
+                    keys = (np.hstack((src[i, j][channel_indexes], [i,j])),)
+                    dst[i, j] = vals[kmeans_class.predict(keys)[0]]
+        else:
+            for i in range(rows):
+                for j in range(cols):
+                    keys = (src[i, j][channel_indexes],)
+                    dst[i, j] = vals[kmeans_class.predict(keys)[0]]
 
 
 
