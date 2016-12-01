@@ -71,8 +71,7 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
  * img1 and img2.
  */
 int gpuNumDifferent(cv::InputArray _img1,
-                     cv::InputArray _img2,
-                     cv::cuda::Stream _stream)
+                     cv::InputArray _img2)
 {
 	const cv::cuda::GpuMat img1 = _img1.getGpuMat();
 	const cv::cuda::GpuMat img2 = _img2.getGpuMat();
@@ -90,6 +89,7 @@ int gpuNumDifferent(cv::InputArray _img1,
 	gpuErrchk( cudaMalloc((void**)&d_diff, sizeof(int)) );
 	gpuErrchk( cudaMemcpy((void*)d_diff, (void*)&h_diff, sizeof(int), cudaMemcpyHostToDevice) );
 
+	cv::cuda::Stream _stream = cv::cuda::Stream();
 	cudaStream_t stream = cv::cuda::StreamAccessor::getStream(_stream);
 	gpuNumDifferentKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img1, img2, d_diff);
 

@@ -19,4 +19,10 @@ std::string type2str(int type);
  */
 std::ostream& operator<<(std::ostream& out, const cv::cudacodec::Codec value);
 
+/**
+ * Checks if there is cuda compatible device available.
+ * returns a negative number if the device does not satisfy the requirements.
+ */
+int verifyCUDACapabilities();
+
 #endif

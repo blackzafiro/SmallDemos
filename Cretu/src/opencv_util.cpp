@@ -1,3 +1,4 @@
+#include <iostream>
 #include "opencv_util.h"
 
 /**
@@ -54,4 +55,13 @@ std::ostream& operator<<(std::ostream& out, const cv::cudacodec::Codec value){
     }
 #undef PROCESS_VAL
     return out << s;
+}
+
+/**
+ * Checks if there is cuda compatible device available.
+ */
+int verifyCUDACapabilities() {
+	int idev = cv::cuda::getCudaEnabledDeviceCount();
+	std::cout << "This computer has " << idev << " cuda enabled device(s)." << std::endl;
+	if (idev == 0) return -1;
 }

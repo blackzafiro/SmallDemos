@@ -21,8 +21,7 @@
 
 // This function is defined in .cu file
 int gpuNumDifferent(cv::InputArray _img1,
-                     cv::InputArray _img2,
-                     cv::cuda::Stream _stream);
+                     cv::InputArray _img2);
 
 /**
  * Prints opencv type
@@ -128,7 +127,7 @@ int main(int argc, const char* argv[])
 		if(d_frame.type() == CV_8UC4)
 		{
 			// Count different pixels between images with custom function
-			ndiff = gpuNumDifferent(d_frame, d_dst, cv::cuda::Stream());
+			ndiff = gpuNumDifferent(d_frame, d_dst);
 
 			std::cout << "Frame " << nframe++ << ": there are " << ndiff << " different "
 		              << type2str(d_frame.type()) << " " << d_frame.size() << " pixels" << std::endl;
