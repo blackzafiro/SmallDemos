@@ -40,52 +40,6 @@ sponge_set_1 = {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/
 ## http://docs.opencv.org/3.1.0/df/d9d/tutorial_py_colorspaces.html
 ## as well
 
-def extract_foreground(gng, get_hsv=False):
-    """ Separate foreground and background using k-means and value.
-    If get_hsv is True it uses Cretu's approach: take mean hsv of foreground and background,
-    the one with biggest value in position zero,
-    else it returns the k-means centroids with hsv and positon coordinates, the centroid
-    with biggest value in position zero.
-    """
-    observations = np.array(list(gng.nodes.keys()))
-    centroids, labels, inertia = cluster.k_means(observations, 2)
-    print("Centroides:\n", centroids)
-
-    # The centroids given by k-means correspond to the mean of all elements in the cluster
-    # for each dimension
-    #print("Etiquetas:\n", labels)
-
-    # Put centroid with greatest value in positon zero (foreground candidate)
-    if centroids[0][2] < centroids[1][2]:
-        temp = np.copy(centroids[0])
-        centroids[0] = centroids[1]
-        centroids[1] = temp
-
-    if get_hsv:
-        # Use only hsv coordinates and ignore position
-        centroids = centroids[:,0:3]
-        #print(centroids)
-        for node, n_data in gng.nodes.items():
-            dist0 = np.linalg.norm(node[0:3] - centroids[0])
-            dist1 = np.linalg.norm(node[0:3] - centroids[1])
-            if dist0 < dist1:
-                n_data.in_foreground = True
-            else:
-                n_data.in_foreground = False
-            #print(node, n_data.in_foreground)
-    else:
-        for key, label in zip(observations, labels):
-            n_data = gng.nodes[tuple(key)]
-            if label == 1:
-                n_data.in_foreground = True
-            else:
-                n_data.in_foreground = False
-            #print(key, n_data.in_foreground)
-    gng.plotNetColorNodes(with_edges=True)
-    gng.ax.scatter(centroids[0][0], centroids[0][1], centroids[0][2], c='r', marker='d', s=100)
-    gng.ax.scatter(centroids[1][0], centroids[1][1], centroids[1][2], c='b', marker='s', s=100)
-    gng.fig.canvas.draw()
-    return centroids
 
 
 def extract_material_finger_background(gng, num_clusters=3):

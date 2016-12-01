@@ -270,21 +270,21 @@ class SegmentationGNG(GNG):
         self.create_node_data = SegmentationNodeData
         self.imageShape = imageShape
 
-    def extract_clusters(self, num_clusters=3, channel_index=1):
+    def extract_clusters(self, num_clusters=3, gng_node_indexes=[1]):
         """ Separate num_clusters using k-means and value.
         It returns the k-means centroids with the color scheme values,
-        it sorts the centroids according to the value in channel_index, with the highest located position zero.
+        it sorts the centroids according to the value in gng_node_indexes, with the highest located position zero.
         Sets attribute kmeans as an indicator of the calibration
         :param num_clusters: Number of classes to identify (each class should be a target object or background.
-        :param channel_index: Index of channel that will be used for classification
+        :param gng_node_indexes: List or tuple of indexes of the gng node that will be used for classification
         :return: None, it just calculates and assigns trained KMeans class instance
         """
-        observations = np.array(list(self.nodes.keys()))[:, [channel_index]]
+        observations = np.array(list(self.nodes.keys()))[:, gng_node_indexes]
         # print(observations)
         kmeans = cluster.KMeans(n_clusters=num_clusters).fit(observations)
         # print("Centroids:\n", kmeans.cluster_centers_, '\nLabels:\n', kmeans.labels_)
 
-        # Put centroid with greatest value in positon zero
+        # Put centroid with greatest luminance in positon zero
         # (background candidate will be last)
         indexes_sorted = kmeans.cluster_centers_[:, 0].argsort()
         kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
@@ -292,21 +292,21 @@ class SegmentationGNG(GNG):
 
         #
         centroids = kmeans.cluster_centers_
-        # print("Sorted by channel " + str(channel_index) + ":\n", centroids, '\n', kmeans.labels_)
+        # print("Sorted by channel " + str(gng_node_indexes) + ":\n", centroids, '\n', kmeans.labels_)
         for node, n_data in self.nodes.items():
-            label = kmeans.predict(((node[channel_index],),))[0]
+            label = kmeans.predict(((node[[gng_node_indexes]],),))[0]
             n_data.label = label
 
         self.plotNetColorNodes(with_edges=True)
         colors = cm.rainbow(np.linspace(0, 1, len(centroids)))
         for centroid in centroids:
             coords = np.zeros(3)
-            coords[channel_index] = centroid
+            coords[[gng_node_indexes]] = centroid
             label = kmeans.predict((centroid,))[0]
             self.ax.scatter(coords[0], coords[1], coords[2], c=colors[label], marker='d', s=100)
         self.fig.canvas.draw()
 
-        self.channel_index = channel_index
+        self.gng_node_indexes = gng_node_indexes
         self.kmeans = kmeans
 
         num_classes = len(kmeans.cluster_centers_)
@@ -325,13 +325,17 @@ class SegmentationGNG(GNG):
         """
         assert hasattr(self, 'kmeans')
         kmeans_class = self.kmeans
-        channel_index = self.channel_index
+        gng_node_indexes = self.gng_node_indexes
+        x_index = True if len(self.nodes.keys()) - 1 is in gng_node_indexes else False
+        y_index = True if len(self.nodes.keys()) - 2 is in gng_node_indexes else False
+
         vals = self.gray_codes
 
         rows, cols = src.shape[0], src.shape[1]
         for i in range(rows):
             for j in range(cols):
-                dst[i, j] = vals[kmeans_class.predict(((src[i, j, channel_index],),))[0]]
+                keys = (src[i, j, channel_index],)
+                dst[i, j] = vals[kmeans_class.predict((keys,))[0]]
 
 
 
