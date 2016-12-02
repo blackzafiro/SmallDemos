@@ -20,7 +20,11 @@ from sklearn import cluster
 import GNG
 from CvUtil import *
 
+##
+## Parameters
+##
 
+## Parameters for GNG Segmentation Network
 segment_params = {'max_age': 40,
                   'lambda_steps': 1000,        # insert node evey lambda steps
                   'epsilon_beta': 0.05,        # 0 < beta < 1
@@ -29,18 +33,19 @@ segment_params = {'max_age': 40,
                   'beta': 0.0005               # 0 < beta < 1
                   }
 
-sponge_set_1 = {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_centre_100.mp4',
-                'roi': ((325, 200), (925, 700)),
-                'file_dst_video': 'sponge_centre_100__filterless_segmented.avi',
-                'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle', }
+## Files
+param_suits = {
+    'sponge_set_1' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_centre_100.mp4',
+                      'roi': ((325, 200), (925, 700)),
+                      'file_dst_video': 'sponge_centre_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle', }
+}
+
 
 
 ## Could try
 ## http://docs.opencv.org/3.1.0/df/d9d/tutorial_py_colorspaces.html
 ## as well
-
-
-### Using only one color channel
 
 def getSegmentationGNG(file_segment_gng = None, plot = False):
     """ Load GNG from file or create it. """
@@ -66,21 +71,13 @@ def getSegmentationGNG(file_segment_gng = None, plot = False):
         gng.plotNetColorNodes(with_edges=True)
     return gng
 
-
-if __name__ == '__main__':
-    nargs = len(sys.argv)
-    param_suit = None
-    if(nargs == 1):
-        cap = cv2.VideoCapture(0)
-    elif(nargs == 2):
-        if sys.argv[1] == 'sponge_set_1':
-            param_suit = sponge_set_1
-            cap = cv2.VideoCapture(param_suit['file_video'])
-        else:
-            cap = cv2.VideoCapture(sys.argv[1])
-    else:
-        print('Usage: ' + sys.argv[0] + ' <video_file_name>')
-        sys.exit(1)
+def generate_segmentation_video(cap, param_suit=None):
+    """
+    Creates a new video file with segmented objects, using the GNG for segmentation.
+    :param cap: VideoCapture object
+    :param param_suit: info in case processing is on video files
+    :return:
+    """
 
     #
     # Process first frame
@@ -102,12 +99,12 @@ if __name__ == '__main__':
     else:
         small_frame = frame
 
-    small_frame = cv2.resize(small_frame, None, fx = 0.5, fy = 0.5, interpolation = cv2.INTER_AREA)
+    small_frame = cv2.resize(small_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
     showChannels(small_frame, ypos=small_frame.shape[0], wait=True)
 
     luv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2Luv)
     showChannels(luv, ypos=small_frame.shape[0], wait=True)
-    #luv = small_frame
+    # luv = small_frame
 
     if param_suit:
         roi_coords = param_suit['roi']
@@ -149,21 +146,22 @@ if __name__ == '__main__':
     segmentGNG.segment_image(luv, dst)
 
     # Save segmented output to video
-    #fourcc = cv2.cv.CV_FOURCC('m', 'p', '4', 'v')
+    # fourcc = cv2.cv.CV_FOURCC('m', 'p', '4', 'v')
     fourcc = cv2.VideoWriter_fourcc(*'X264')
     print(dst.shape)
-    out = cv2.VideoWriter(param_suit['file_dst_video'], fourcc, 20, (dst.shape[1], dst.shape[0]), False) # 20 frames/s no color
+    out = cv2.VideoWriter(param_suit['file_dst_video'], fourcc, 20, (dst.shape[1], dst.shape[0]),
+                          False)  # 20 frames/s no color
     out.write(dst)
 
-    #print("Press key to start tracking")
-    #if cv2.waitKey() & 0xFF == ord('q'):
+    # print("Press key to start tracking")
+    # if cv2.waitKey() & 0xFF == ord('q'):
     #    sys.exit(0)
 
     cv2.destroyAllWindows()
     print("Start tracking...")
 
     num_frame = 2
-    while(cap.isOpened()):
+    while (cap.isOpened()):
         ## Capture frame-by-frame
         ret, frame = cap.read()
         if not ret: break
@@ -191,10 +189,27 @@ if __name__ == '__main__':
             break
 
     out.release()
-    print("Processing finished.  Press key to end program.")
-    if cv2.waitKey() & 0xFF == ord('q'):
-        sys.exit(0)
 
+
+if __name__ == '__main__':
+    nargs = len(sys.argv)
+    param_suit = None
+    if(nargs == 1):
+        cap = cv2.VideoCapture(0)
+    elif(nargs == 2):
+        if sys.argv[1] in param_suits:
+            param_suit = param_suits[sys.argv[1]]
+            cap = cv2.VideoCapture(param_suit['file_video'])
+        else:
+            cap = cv2.VideoCapture(sys.argv[1])
+    else:
+        print('Usage: ' + sys.argv[0] + ' <param_suit>')
+        sys.exit(1)
+
+    generate_segmentation_video(cap, param_suit)
+
+    print("Processing finished.  Press key to end program.")
+    cv2.waitKey()
     # When everything is done, release the capture
     cap.release()
     cv2.destroyAllWindows()
