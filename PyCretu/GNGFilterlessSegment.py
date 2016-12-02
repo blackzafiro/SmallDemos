@@ -38,7 +38,31 @@ param_suits = {
     'sponge_set_1' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_centre_100.mp4',
                       'roi': ((325, 200), (925, 700)),
                       'file_dst_video': 'sponge_centre_100__filterless_segmented.avi',
-                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle', }
+                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
+                      'color_space': cv2.COLOR_BGR2Luv },
+    'sponge_set_2' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_longside_100.mp4',
+                      'roi': ((270, 200), (800, 700)),
+                      'file_dst_video': 'sponge_longside_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
+                      'color_space': cv2.COLOR_BGR2Luv },
+    'sponge_set_3' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_shortside_100.mp4',
+                      'roi': ((375, 150), (850, 675)),
+                      'file_dst_video': 'sponge_shortside_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
+                      'color_space': cv2.COLOR_BGR2Luv },
+    'plasticine_set_1' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_centre_100_below.mp4',
+                      'roi': ((450, 100), (1000, 500)),
+                      'file_dst_video': 'plasticine_centre_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_pcentre.pickle', },
+    'plasticine_set_2': {
+                      'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_longside_100_below.mp4',
+                      'roi': ((270, 200), (800, 700)),
+                      'file_dst_video': 'plasticine_longside_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_pcentre.pickle', },
+    'plasticine_set_3' : {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_shortside_100_below.mp4',
+                      'roi': ((375, 150), (850, 675)),
+                      'file_dst_video': 'plasticine_shortside_100__filterless_segmented.avi',
+                      'file_segment_gng': 'luv_5charac_segment_gng_pcentre.pickle', }
 }
 
 
@@ -46,9 +70,14 @@ param_suits = {
 ## Could try
 ## http://docs.opencv.org/3.1.0/df/d9d/tutorial_py_colorspaces.html
 ## as well
-
-def getSegmentationGNG(file_segment_gng = None, plot = False):
-    """ Load GNG from file or create it. """
+def getSegmentationGNG(file_segment_gng = None, plot = False, img = None):
+    """
+    Load GNG from file or create it using img
+    :param img: first frame of video, if gng will be calibrated.
+    :param file_segment_gng:
+    :param plot:
+    :return:
+    """
     gng = None
     if file_segment_gng:
         seg_path = Path(file_segment_gng)
@@ -61,7 +90,7 @@ def getSegmentationGNG(file_segment_gng = None, plot = False):
                     del gng.ax
     if gng is None:
         start_time = time.time()
-        gng = GNG.calibrateSegmentationGNG(luv, segment_params)
+        gng = GNG.calibrateSegmentationGNG(img, segment_params)
         print("--- %s seconds to callibrate segmentation GNG ---" % (time.time() - start_time))
         if param_suit:
             with open(param_suit['file_segment_gng'], 'wb') as f:
@@ -102,7 +131,11 @@ def generate_segmentation_video(cap, param_suit=None):
     small_frame = cv2.resize(small_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
     showChannels(small_frame, ypos=small_frame.shape[0], wait=True)
 
-    luv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2Luv)
+    if param_suit is not None and 'color_space' in param_suit:
+        print("Changing color space to " + param_suit['color_space'])
+        luv = cv2.cvtColor(small_frame, param_suit['color_space'])
+    else:
+        luv = small_frame
     showChannels(luv, ypos=small_frame.shape[0], wait=True)
     # luv = small_frame
 
@@ -124,7 +157,8 @@ def generate_segmentation_video(cap, param_suit=None):
         sys.exit(0)
 
     segmentGNG = getSegmentationGNG(param_suit['file_segment_gng'] if param_suit else None,
-                                    False if param_suit else True)
+                                    False if param_suit else True,
+                                    img = luv)
 
     # Use K-Means to separate foreground from background
     dst = np.zeros((luv.shape[0], luv.shape[1]), dtype=np.uint8)
@@ -174,7 +208,10 @@ def generate_segmentation_video(cap, param_suit=None):
         else:
             small_frame = frame
         small_frame = cv2.resize(small_frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
-        luv = cv2.cvtColor(small_frame, cv2.COLOR_BGR2Luv)
+        if param_suit is not None and 'color_space' in param_suit:
+            luv = cv2.cvtColor(small_frame, param_suit['color_space'])
+        else:
+            luv = small_frame
         segmentGNG.segment_image(luv, dst)
         out.write(dst)
 
