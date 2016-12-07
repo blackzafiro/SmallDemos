@@ -25,7 +25,7 @@ def conversion_to_string(cv_code):
     """
     strs = {cv2.COLOR_BGR2GRAY:"bgr to gray",
             cv2.COLOR_BGR2HSV:"bgr to hsv",
-            cv2.COLOR_BGR2Luv:"bgr to luv",
+            cv2.COLOR_BGR2Luv:"bgr to Luv",
             cv2.COLOR_BGR2XYZ:"bgr to xyz",
             cv2.COLOR_BGR2YCrCb:"bgr to YCrCb",
             cv2.COLOR_BGR2HLS:"bgr to hls",

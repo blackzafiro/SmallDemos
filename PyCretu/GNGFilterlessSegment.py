@@ -37,22 +37,22 @@ param_suits = {
                'file_segment_gng':'bgr_camera.pickle',
                'classify':True,
                'feature_indices':[0,1,2]},
-    'sponge_set_1': {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_centre_100.mp4',
+    'sponge_set_1': {'file_video': '/home/blackzafiro/Programas/MassSpringIV/data/press/sponge_centre_100.mp4',
                      'roi': ((325, 200), (925, 700)),
                      'file_dst_video': 'sponge_centre_100__filterless_segmented.avi',
                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
                      'color_space': cv2.COLOR_BGR2Luv},
-    'sponge_set_2': {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_longside_100.mp4',
+    'sponge_set_2': {'file_video': '/home/blackzafiro/Programas/MassSpringIV/data/press/sponge_longside_100.mp4',
                      'roi': ((270, 200), (800, 700)),
                      'file_dst_video': 'sponge_longside_100__filterless_segmented.avi',
                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
                      'color_space': cv2.COLOR_BGR2Luv},
-    'sponge_set_3': {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/sponge_shortside_100.mp4',
+    'sponge_set_3': {'file_video': '/home/blackzafiro/Programas/MassSpringIV/data/press/sponge_shortside_100.mp4',
                      'roi': ((375, 150), (850, 675)),
                      'file_dst_video': 'sponge_shortside_100__filterless_segmented.avi',
                      'file_segment_gng': 'luv_5charac_segment_gng_scentre.pickle',
                      'color_space': cv2.COLOR_BGR2Luv},
-    'plasticine_set_1': {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_centre_100_below.mp4',
+    'plasticine_set_1': {'file_video': '/home/blackzafiro/Programas/PhD/MassSpringIV/data/press/plasticine_centre_100_below.mp4',
                          'roi': ((450, 100), (1000, 500)),
                          'file_dst_video': 'a_plasticine_centre_100__filterless_segmented.avi',
                          'file_segment_gng': 'lab_segment_gng_pcentre.pickle',
@@ -60,11 +60,11 @@ param_suits = {
                          'classify':True,
                          'feature_indices':[1]},
     'plasticine_set_2': {
-                      'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_longside_100_below.mp4',
+                      'file_video': '/home/blackzafiro/Programas/MassSpringIV/data/press/plasticine_longside_100_below.mp4',
                       'roi': ((270, 200), (800, 700)),
                       'file_dst_video': 'plasticine_longside_100__filterless_segmented.avi',
                       'file_segment_gng': 'luv_5charac_segment_gng_pcentre.pickle'},
-    'plasticine_set_3': {'file_video': '/home/blackzafiro/Programacion/MassSpringIV/data/press/plasticine_shortside_100_below.mp4',
+    'plasticine_set_3': {'file_video': '/home/blackzafiro/Programas/MassSpringIV/data/press/plasticine_shortside_100_below.mp4',
                       'roi': ((375, 150), (850, 675)),
                       'file_dst_video': 'plasticine_shortside_100__filterless_segmented.avi',
                       'file_segment_gng': 'luv_5charac_segment_gng_pcentre.pickle'}
@@ -171,7 +171,8 @@ def generate_segmentation_video(cap, param_suit=None):
     if not hasattr(segmentGNG, 'kmeans') or ('classify' in param_suit and param_suit['classify']):
         print("Clustering neurons...")
         indices = param_suit['feature_indices']
-        segmentGNG.extract_clusters(gng_node_indexes=indices)
+        sort_by_feature = param_suit['sort_by_feature'] if 'sort_by_feature' in param_suit else 0
+        segmentGNG.extract_clusters(gng_node_indexes=indices, sort_by_feature=sort_by_feature)
         segmentGNG.show()
         with open(param_suit['file_segment_gng'], 'wb') as f:
             pickle.dump(segmentGNG, f)
@@ -227,7 +228,7 @@ def generate_segmentation_video(cap, param_suit=None):
         cv2.imshow('luv', luv)
         cv2.moveWindow('luv', 0, 0)
         cv2.imshow('dst', dst)
-        cv2.moveWindow('luv', dst.shape[1], 0)
+        cv2.moveWindow('dst', dst.shape[1], 0)
 
         print("Frame ", num_frame)
         num_frame += 1

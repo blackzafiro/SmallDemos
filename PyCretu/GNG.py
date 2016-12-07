@@ -270,13 +270,14 @@ class SegmentationGNG(GNG):
         self.create_node_data = SegmentationNodeData
         self.imageShape = imageShape
 
-    def extract_clusters(self, num_clusters=3, gng_node_indexes=[1]):
+    def extract_clusters(self, num_clusters=3, gng_node_indexes=[1], sort_by_feature=0):
         """ Separate num_clusters using k-means and value.
         It returns the k-means centroids with the color scheme values,
-        it sorts the centroids according to the value in gng_node_indexes, with the highest located position zero.
+        it sorts the centroids according to the value in gng_node_indexes at positon sort_by_feature.
         Sets attribute kmeans as an indicator of the calibration
         :param num_clusters: Number of classes to identify (each class should be a target object or background.
-        :param gng_node_indexes: List or tuple of indexes of the gng node that will be used for classification
+        :param gng_node_indexes: List or tuple of indexes of the gng nodes that will be used for classification.
+        :param sort_by_feature: Index of feature in gng_node_indexes that will be used to order the clusters.
         :return: None, it just calculates and assigns trained KMeans class instance
         """
         observations = np.array(list(self.nodes.keys()))[:, gng_node_indexes]
@@ -286,13 +287,13 @@ class SegmentationGNG(GNG):
 
         # Put centroid with greatest luminance in positon zero
         # (background candidate will be last)
-        indexes_sorted = kmeans.cluster_centers_[:, 0].argsort()
+        indexes_sorted = kmeans.cluster_centers_[:, sort_by_feature].argsort()
         kmeans.cluster_centers_ = kmeans.cluster_centers_[indexes_sorted]
         kmeans.labels_ = kmeans.predict(observations)
 
         # Assign label to gng nodes
         centroids = kmeans.cluster_centers_
-        print("Sorted by channel " + str(gng_node_indexes) + ":\n", centroids, '\n', kmeans.labels_)
+        print("Clustered by ", str(gng_node_indexes), "Sorted by channel " + str(sort_by_feature) + ":\n", centroids, '\n', kmeans.labels_)
 
         for node, n_data in self.nodes.items():
             data = np.array(node)[[gng_node_indexes]]
