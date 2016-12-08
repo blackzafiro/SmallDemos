@@ -35,6 +35,9 @@ class OpenCVProgressBar:
         cv2.waitKey(1)
         
     def close(self):
+        """ Close progress bar.
+        After using this methos it won't usable anymore.
+        """
         cv2.destroyWindow('progress_bar')
 
 
@@ -54,6 +57,7 @@ class GNGNodeData(object):
         self.edges.append(edge)
         
     def remove_edge_with(self, node):
+        """ Removes edge starting on node. """
         for edge in self.edges:
             if edge[0] == node:
                 self.edges.remove(edge)
@@ -266,6 +270,7 @@ class SegmentationGNG(GNG):
     """ GNG used to caracterize clusters in image by HSV,xy info. """
 
     def __init__(self, imageShape, max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta):
+        """ Initializes image segmentation info. """
         super(SegmentationGNG, self).__init__(max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta)
         self.create_node_data = SegmentationNodeData
         self.imageShape = imageShape
