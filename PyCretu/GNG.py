@@ -266,6 +266,19 @@ class SegmentationNodeData(GNGNodeData):
         self.label = 0
 
 
+def cluster_colours(num_clusters):
+    """
+    Create a tone of gray for each class
+    :param num_clusters: number of clusters to represent
+    :return: list of grays one for each cluster
+    """
+    step = math.ceil(255 / (num_clusters - 1))
+    vals = np.min(np.array((np.ceil(np.arange(num_clusters) * step),
+                            np.ones(num_clusters) * 255)),
+                  0)
+    return vals
+
+
 class SegmentationGNG(GNG):
     """ GNG used to caracterize clusters in image by HSV,xy info. """
 
@@ -321,11 +334,7 @@ class SegmentationGNG(GNG):
         self.kmeans = kmeans
 
         num_classes = len(kmeans.cluster_centers_)
-        step = math.ceil(255 / (num_classes - 1))
-        vals = np.min(np.array((np.ceil(np.arange(num_classes) * step),
-                                np.ones(num_classes) * 255)),
-                      0)
-        self.gray_codes = vals
+        self.gray_codes = cluster_colours(num_classes)
 
     def segment_image(self, src, dst):
         """
