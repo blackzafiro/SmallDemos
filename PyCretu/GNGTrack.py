@@ -40,24 +40,28 @@ def get_objects(img, grays):
     return img_objects
 
 
-def detect_borders(img, param_suit, ypos = 0):
+def detect_borders(img, param_suit, num_label = 0):
     """ Detect borders using sobel. """
+    ypos = num_label * img.shape[0]
     # Apply median filtering
-    cv2.imshow('Image', img)
-    cv2.moveWindow('Image', 0, ypos)
+    cv2.imshow('Image ' + str(num_label), img)
+    cv2.moveWindow('Image ' + str(num_label), 0, ypos)
     dst = cv2.medianBlur(img, param_suit['median_kernel_size'])
-    cv2.imshow('Median filtered', dst)
-    cv2.moveWindow('Median filtered', img.shape[1], ypos)
+    cv2.imshow('Median filtered ' + str(num_label), dst)
+    cv2.moveWindow('Median filtered ' + str(num_label), img.shape[1], ypos)
 
     # Use sobel edge detection
     ksize = param_suit['sobel_kernel_size']
     sobelx = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 1, 0, ksize=ksize))
     sobely = np.absolute(cv2.Sobel(dst, cv2.CV_64F, 0, 1, ksize=ksize))
-    sobel = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
-    cv2.imshow('Sobel', sobel)
-    cv2.moveWindow('Sobel', 2 * dst.shape[1], ypos)
+    # Trick in http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_gradients/py_gradients.html
+    sobelx64f = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
+    abs_sobel64f = np.absolute(sobelx64f)
+    sobel_8u = np.uint8(abs_sobel64f)
+    cv2.imshow('Sobel ' + str(num_label), sobel_8u)
+    cv2.moveWindow('Sobel ' + str(num_label), 2 * dst.shape[1], ypos)
 
-    return dst
+    return sobel_8u
 
 
 def track(cap, param_suit):
@@ -74,14 +78,11 @@ def track(cap, param_suit):
         start_time = time.time()
 
         images = get_objects(frame, grays)
-        for img in images:
-            detect_borders(img, param_suit)
+        for i, img in enumerate(images):
+            dst = detect_borders(img, param_suit, i)
 
         print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
 
-        for i, img in enumerate(images):
-            cv2.imshow('segmented'+str(i), frame)
-            cv2.moveWindow('segmented'+str(i), i * img.shape[1], img.shape[0])
 
         print("Frame ", num_frame)
         num_frame += 1
