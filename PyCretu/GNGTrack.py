@@ -16,16 +16,18 @@ import matplotlib.cm as cm
 import GNG
 from CvUtil import *
 
+Y_SHIFT = 40
 # The images have num_cluster colours
 num_objects = 2
 param_suits = {
     'sponge_set_1': {'file_video': 'data/generated_videos/sponge_centre_100__filterless_segmented.avi',
                      'color_indices':[0,1,2],   # color in pos 0 is background
+                     'loss_threshold':25,
                      'median_kernel_size': 7,
-                     'sobel_kernel_size': 1}
+                     'sobel_kernel_size': 3}
 }
 
-def get_objects(img, grays):
+def get_objects(img, grays, loss_threshold):
     """
     Creates images with background in black and object in white
     :param img: presegmented image
@@ -34,15 +36,21 @@ def get_objects(img, grays):
     """
     background_colour = grays[0]
     img_objects = []
+    np.set_printoptions(threshold=np.inf)
     for i in range(1, len(grays)):
         # TODO: separate object
-        img_objects.append(img)
+        binary = np.zeros((img.shape[0], img.shape[1]), np.uint8)
+        yes = np.logical_and(img >= grays[i] - loss_threshold,
+                             img <= grays[i] + loss_threshold)[:,:,0]
+        binary[yes] = 255
+        binary[~yes] = 0
+        img_objects.append(binary)
     return img_objects
 
 
 def detect_borders(img, param_suit, num_label = 0):
     """ Detect borders using sobel. """
-    ypos = num_label * img.shape[0]
+    ypos = num_label * (img.shape[0] + Y_SHIFT)
     # Apply median filtering
     cv2.imshow('Image ' + str(num_label), img)
     cv2.moveWindow('Image ' + str(num_label), 0, ypos)
@@ -58,15 +66,41 @@ def detect_borders(img, param_suit, num_label = 0):
     sobelx64f = cv2.addWeighted(sobelx, 0.5, sobely, 0.5, 0)
     abs_sobel64f = np.absolute(sobelx64f)
     sobel_8u = np.uint8(abs_sobel64f)
+    # print(sobel_8u.shape)
+    # print(sobel_8u.dtype)
+    # print(type(sobel_8u[0]))
+    # print(type(sobel_8u[0,0]))
     cv2.imshow('Sobel ' + str(num_label), sobel_8u)
     cv2.moveWindow('Sobel ' + str(num_label), 2 * dst.shape[1], ypos)
 
     return sobel_8u
 
 
-def track(cap, param_suit):
+def track_material(img, num_label = 0):
+    """ Use NG to track deformable material. """
+    im2, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    print(len(contours))
+    imc = np.zeros(im2.shape)
+    #cnt = contours[0]
+    #cv2.drawContours(im2, [cnt], 0, (0, 255, 0), 1)
+    cv2.drawContours(imc, contours, -1, (0, 255, 0), 1)
+    cv2.imshow('Contour', im2)
+    cv2.moveWindow('Contour', 4 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
+    if cv2.waitKey() & 0xFF == ord('q'):
+        sys.exit(-1)
+
+
+
+def track_objects(contour_imgs):
+    """ Function specific to the problem of tracking the finger and material
+    pushed by the robot. """
+    track_material(contour_imgs[0])
+
+
+def track(cap, param_suit, process):
     """ Use NG to track contours"""
     grays = GNG.cluster_colours(num_objects + 1)[param_suit['color_indices']]
+    loss_threshold = param_suit['loss_threshold']
 
     num_frame = 1
     while (cap.isOpened()):
@@ -77,9 +111,12 @@ def track(cap, param_suit):
         ## Our operations on the frame come here
         start_time = time.time()
 
-        images = get_objects(frame, grays)
+        images = get_objects(frame, grays, loss_threshold)
+        dsts = []
         for i, img in enumerate(images):
-            dst = detect_borders(img, param_suit, i)
+            dsts.append(detect_borders(img, param_suit, i))
+
+        process(dsts)
 
         print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
 
@@ -107,7 +144,7 @@ if __name__ == '__main__':
     else:
         print_usage(sys.argv[0])
 
-    track(cap, param_suit)
+    track(cap, param_suit, track_objects)
 
     print("Processing finished.  Press key to end program.")
     cv2.waitKey()
