@@ -16,15 +16,26 @@ import matplotlib.cm as cm
 import GNG
 from CvUtil import *
 
-Y_SHIFT = 40
+Y_SHIFT = 150
 # The images have num_cluster colours
 num_objects = 2
+
+## Parameters for GNG Segmentation Network
+tracking_params = {'px_cicles':4,
+                  'max_age': 40,
+                  'lambda_steps': 1000,        # insert node evey lambda steps
+                  'epsilon_beta': 0.05,        # 0 < beta < 1
+                  'epsilon_eta': 0.0006,       # 0 < eta < 1
+                  'alfa': 0.5,                 # 0 < alfa < 1
+                  'beta': 0.0005               # 0 < beta < 1
+                  }
+
 param_suits = {
     'sponge_set_1': {'file_video': 'data/generated_videos/sponge_centre_100__filterless_segmented.avi',
                      'color_indices':[0,1,2],   # color in pos 0 is background
                      'loss_threshold':25,
                      'median_kernel_size': 7,
-                     'sobel_kernel_size': 3}
+                     'sobel_kernel_size': 1}
 }
 
 def get_objects(img, grays, loss_threshold):
@@ -76,33 +87,83 @@ def detect_borders(img, param_suit, num_label = 0):
     return sobel_8u
 
 
-def track_material(img, num_label = 0):
-    """ Use NG to track deformable material. """
-    im2, contours, hierarchy = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    print(len(contours))
-    imc = np.zeros(im2.shape)
-    #cnt = contours[0]
-    #cv2.drawContours(im2, [cnt], 0, (0, 255, 0), 1)
-    cv2.drawContours(imc, contours, -1, (0, 255, 0), 1)
-    cv2.imshow('Contour', im2)
-    cv2.moveWindow('Contour', 4 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
-    if cv2.waitKey() & 0xFF == ord('q'):
-        sys.exit(-1)
+class FingerMaterialTracker:
+    """ Tracks the finger and the material using GNG and NG networks. """
+    material_num_label = 0
+    finger_num_label = 1
+
+    def __init__(self, contour_imgs):
+        """ Initializes tracker data.
+        """
+        self._init_material(contour_imgs[self.material_num_label])
+
+    def process(self, contour_imgs):
+        self._track_objects(contour_imgs)
+
+    def _extract_contours(self, img, num_label=0):
+        """ Get external contour from image and show in screen. """
+        im2, contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        print("number of contours = ", len(contours))
+        imc = np.zeros(im2.shape)
+        cnt = max(contours, key=len)
+        cv2.drawContours(imc, [cnt], 0, 255, 1)
+        # cv2.drawContours(imc, contours, -1, 255, 1)
+        cv2.imshow('Contour', imc)
+        cv2.moveWindow('Contour', 4 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
+        if cv2.waitKey() & 0xFF == ord('q'):
+            sys.exit(-1)
+        return cnt
+
+    def _init_material(self, material_contour_img):
+        """ Creates initial contour approximation with GNG. """
+        contour = self._extract_contours(material_contour_img, self.material_num_label)
+        gng = GNG.calibrate_tracking_GNG(contour, tracking_params)
+        gng.draw(material_contour_img)
+
+    def _track_material(self, img, num_label=0):
+        """ Use NG to track deformable material. """
+        contour = self._extract_contours(img, num_label)
+
+    def _track_objects(self, contour_imgs):
+        """ Function specific to the problem of tracking the finger and material
+        pushed by the robot. """
+        self._track_material(contour_imgs[0])
 
 
-
-def track_objects(contour_imgs):
-    """ Function specific to the problem of tracking the finger and material
-    pushed by the robot. """
-    track_material(contour_imgs[0])
-
-
-def track(cap, param_suit, process):
+def track(cap, param_suit, TrackerClass):
     """ Use NG to track contours"""
     grays = GNG.cluster_colours(num_objects + 1)[param_suit['color_indices']]
     loss_threshold = param_suit['loss_threshold']
 
+    tracker = None
     num_frame = 1
+
+    ## Create GNG from contour in first frame
+    if cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            print("Couldn't read first movie frame.", file=sys.stderr)
+            return -1
+        start_time = time.time()
+
+        images = get_objects(frame, grays, loss_threshold)
+        dsts = []
+        for i, img in enumerate(images):
+            dsts.append(detect_borders(img, param_suit, i))
+
+        tracker = TrackerClass(dsts)
+
+        print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
+
+        print("Frame ", num_frame)
+        num_frame += 1
+        if cv2.waitKey(10) & 0xFF == ord('q'):
+            return
+
+    else:
+        print("Couldn't open movie.", file=sys.stderr)
+        return -1
+
     while (cap.isOpened()):
         ## Capture frame-by-frame
         ret, frame = cap.read()
@@ -116,7 +177,7 @@ def track(cap, param_suit, process):
         for i, img in enumerate(images):
             dsts.append(detect_borders(img, param_suit, i))
 
-        process(dsts)
+        tracker.process(dsts)
 
         print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
 
@@ -144,7 +205,7 @@ if __name__ == '__main__':
     else:
         print_usage(sys.argv[0])
 
-    track(cap, param_suit, track_objects)
+    track(cap, param_suit, FingerMaterialTracker)
 
     print("Processing finished.  Press key to end program.")
     cv2.waitKey()

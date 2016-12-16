@@ -455,13 +455,16 @@ class ErrorPlot:
         
     def save_plot(self, file_name):
         self.fig.savefig(file_name, bbox_inches='tight')
-        
+
+
 def calibrateSegmentationGNG(hsv, segment_params):
     """ Receives one image to calibrate the GNG for segmentation.
     Returns the GNG
     """
-    # Randomly select a and b
     shape = hsv.shape
+    px_cicles = segment_params['px_cicles']
+    del segment_params['px_cicles']
+    # Randomly select a and b
     #print("Size of image: ", shape)
     xa, ya, xb, yb = 0, 0, 0, 0
     max_x = shape[1] - 1
@@ -481,13 +484,12 @@ def calibrateSegmentationGNG(hsv, segment_params):
     
     pbar = OpenCVProgressBar()
     cv2.imshow('progress_bar', pbar.img)
-    step = 0
     last_step = shape[0] * shape[1]
     error_plot = ErrorPlot()
     errors = []
+    step = 0
     # Repeat n times
-    for i in range(0, 4):
-        step = 0
+    for i in range(0, segment_params['px_cicles']):
         pbar.set_progress(0)
         for yrow in range(0, shape[0]):
             for xcol in range(0, shape[1]):
@@ -499,12 +501,65 @@ def calibrateSegmentationGNG(hsv, segment_params):
                 step += 1
                 if step % lambda_steps  == 0:
                     gng.insert_node()
+                    errors.append(gng.decrease_all_errors())
             if y % 20 == 0:
                 gng.plotNetColorNodes()
                 gng.show()
                 error_plot.plot(errors)
             pbar.set_progress(step/last_step)
-            errors.append(gng.decrease_all_errors())
     pbar.close()
     error_plot.save_plot('error_plot.png')
+    return gng
+
+
+class TrackingGNG(GNG):
+    """ Samples points of a contour. """
+
+    def __init__(self, contour, max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta):
+        """ Initializes contour sampling info. """
+        super(TrackingGNG, self).__init__(max_age, lambda_steps, epsilon_beta, epsilon_eta, alfa, beta)
+
+    def draw(self, img):
+        """ Plots its nodes on img. """
+        print("I haven't implemented GNG draw!!!")
+
+
+def calibrate_tracking_GNG(contour, tracking_params):
+    """ Receives list of points in contour.
+    Returns the GNG.
+    """
+    num_points = len(contour)
+    px_cicles = tracking_params['px_cicles']
+    del tracking_params['px_cicles']
+    # Randomly select a and b
+    a, b = 0, 0
+    while(a == b):
+        a = random.randint(0, num_points - 1)
+        b = random.randint(0, num_points - 1)
+
+    gng = TrackingGNG(contour, **tracking_params)
+    # TODO: Fix here
+    gng.add_node(tuple(contour[a]))
+    gng.add_node(tuple(contour[b]))
+
+    lambda_steps = tracking_params['lambda_steps']
+
+    # Apply to points in contour
+
+    last_step = num_points
+    error_plot = ErrorPlot()
+    errors = []
+    step = 0
+    # Repeat px_cicles times
+    for i in range(0, px_cicles):
+        rand_indices = np.random.shuffle(np.arange(0, num_points))
+        for coord_i in rand_indices:
+            gng.shift_closest_pair(contour[coord_i])
+            gng.delete_old_edges()
+            step += 1
+            if step % lambda_steps == 0:
+                gng.insert_node()
+                errors.append(gng.decrease_all_errors())
+        error_plot.save_plot('error_plot.png')
+    error_plot.plot(errors)
     return gng

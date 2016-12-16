@@ -23,7 +23,8 @@ from CvUtil import *
 ##
 
 ## Parameters for GNG Segmentation Network
-segment_params = {'max_age': 40,
+segment_params = {'px_cicles':4,
+                  'max_age': 40,
                   'lambda_steps': 1000,        # insert node evey lambda steps
                   'epsilon_beta': 0.05,        # 0 < beta < 1
                   'epsilon_eta': 0.0006,       # 0 < eta < 1
