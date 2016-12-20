@@ -521,11 +521,14 @@ class TrackingGNG(GNG):
 
     def draw(self, img):
         """ Plots its nodes on img. """
-        print("I haven't implemented GNG draw!!!")
+        print("show: There are ", len(self.nodes), " nodes in TrackingGNG")
+        for key in self.nodes.keys():
+            coord = (int(key[0]), int(key[1]))
+            cv2.circle(img, coord, 3, 255, -1)
 
 
 def calibrate_tracking_GNG(contour, tracking_params):
-    """ Receives list of points in contour.
+    """ Receives a 2D numpy array of points in contour.
     Returns the GNG.
     """
     num_points = len(contour)
@@ -538,7 +541,7 @@ def calibrate_tracking_GNG(contour, tracking_params):
         b = random.randint(0, num_points - 1)
 
     gng = TrackingGNG(contour, **tracking_params)
-    # TODO: Fix here
+    print(contour[a], type(contour[a]), tuple(contour[a]), type(contour[a]))
     gng.add_node(tuple(contour[a]))
     gng.add_node(tuple(contour[b]))
 
@@ -552,7 +555,8 @@ def calibrate_tracking_GNG(contour, tracking_params):
     step = 0
     # Repeat px_cicles times
     for i in range(0, px_cicles):
-        rand_indices = np.random.shuffle(np.arange(0, num_points))
+        rand_indices = np.arange(0, num_points)
+        np.random.shuffle(rand_indices)
         for coord_i in rand_indices:
             gng.shift_closest_pair(contour[coord_i])
             gng.delete_old_edges()

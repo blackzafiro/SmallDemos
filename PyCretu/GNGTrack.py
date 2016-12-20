@@ -21,9 +21,9 @@ Y_SHIFT = 150
 num_objects = 2
 
 ## Parameters for GNG Segmentation Network
-tracking_params = {'px_cicles':4,
+tracking_params = {'px_cicles':8,
                   'max_age': 40,
-                  'lambda_steps': 1000,        # insert node evey lambda steps
+                  'lambda_steps': 100,        # insert node evey lambda steps
                   'epsilon_beta': 0.05,        # 0 < beta < 1
                   'epsilon_eta': 0.0006,       # 0 < eta < 1
                   'alfa': 0.5,                 # 0 < alfa < 1
@@ -109,16 +109,19 @@ class FingerMaterialTracker:
         cv2.drawContours(imc, [cnt], 0, 255, 1)
         # cv2.drawContours(imc, contours, -1, 255, 1)
         cv2.imshow('Contour', imc)
-        cv2.moveWindow('Contour', 4 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
-        if cv2.waitKey() & 0xFF == ord('q'):
-            sys.exit(-1)
-        return cnt
+        cv2.moveWindow('Contour', 3 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
+        cnt = cnt[:,0,:]
+        #print(cnt, type(cnt), cnt.shape)
+        return cnt, imc
 
     def _init_material(self, material_contour_img):
         """ Creates initial contour approximation with GNG. """
-        contour = self._extract_contours(material_contour_img, self.material_num_label)
+        contour, imc = self._extract_contours(material_contour_img, self.material_num_label)
         gng = GNG.calibrate_tracking_GNG(contour, tracking_params)
-        gng.draw(material_contour_img)
+        gng.draw(imc)
+        cv2.imshow('Contour', imc)
+        if cv2.waitKey() & 0xFF == ord('q'):
+            sys.exit(-1)
 
     def _track_material(self, img, num_label=0):
         """ Use NG to track deformable material. """
