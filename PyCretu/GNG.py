@@ -522,9 +522,43 @@ class TrackingGNG(GNG):
     def draw(self, img):
         """ Plots its nodes on img. """
         print("show: There are ", len(self.nodes), " nodes in TrackingGNG")
-        for key in self.nodes.keys():
+        for key, data in self.nodes.items():
             coord = (int(key[0]), int(key[1]))
             cv2.circle(img, coord, 3, 255, -1)
+            for edge in data.edges:
+                q = tuple(np.array(edge[0]).astype(int))
+                cv2.line(img, coord, q, 255, 2)
+
+    def contour(self):
+        """ Returns the approximated contour in a 2D numpy array. """
+        EPSILON = 0.00000001
+        coords = list(self.nodes.keys())
+        #print(coords)
+        start = prev = coords[0]
+        edges = self.nodes[start].edges
+        if len(edges) != 2:
+            raise Exception("Must have only two neighbours, has: " + str(len(edges)) + " Train for longer?")
+        next = tuple(edges[0][0]) # edge = (edge_coords, age)
+        list_of_coords = []
+        #print(prev, next)
+        diff = np.abs(np.array(next) - np.array(start))
+        while diff[0] > EPSILON and diff[1] > EPSILON:
+            list_of_coords.append(next)
+            edges = self.nodes[next].edges
+            #print(next, edges)
+            neighbour1 = tuple(edges[0][0])
+            diff = np.abs(np.array(neighbour1) - np.array(prev))
+            prev = next
+            if diff[0] < EPSILON and diff[1] < EPSILON:
+                #print(neighbour1, prev, diff)
+                next = tuple(edges[1][0])
+            else:
+                #print("No pasa, ", neighbour1, prev, diff)
+                next = neighbour1
+            diff = np.abs(np.array(next) - np.array(start))
+        list_of_coords.append(next)
+        print("There are ", len(list_of_coords), " points in contour.")
+        return np.array(list_of_coords)
 
 
 def calibrate_tracking_GNG(contour, tracking_params):
