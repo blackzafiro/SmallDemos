@@ -37,6 +37,7 @@ neural_gas_params = {'epsilon': 0.05,
 
 param_suits = {
     'sponge_set_1': {'file_video': 'data/generated_videos/sponge_centre_100__filterless_segmented.avi',
+                     'file_save': 'data/pickles/sponge_set_1_track',
                      'color_indices':[0,1,2],   # color in pos 0 is background
                      'loss_threshold':25,
                      'median_kernel_size': 7,
@@ -98,24 +99,35 @@ class FingerMaterialTracker:
     finger_num_label = 1
 
     def __init__(self, contour_imgs):
-        """ Initializes tracker data.
-        """
+        """ Initializes tracker data. """
+        finger_image = contour_imgs[self.finger_num_label]
+        self._track_finger(finger_image)
+        cv2.moveWindow('Contour ' + str(self.finger_num_label), 3 * finger_image.shape[1], self.finger_num_label * (finger_image.shape[0] + Y_SHIFT))
+
         self.contour = self._init_material(contour_imgs[self.material_num_label])
+
+        self.finger_positions = [self.finger_position]
+        self.contour_coordinates = [self.contour.ravel()]
+        if cv2.waitKey() & 0xFF == ord('q'):
+            sys.exit(-1)
 
     def process(self, contour_imgs):
         """ Tracks finger and material, gathering required information. """
         self._track_objects(contour_imgs)
+        self.finger_positions.append(self.finger_position)
+        self.contour_coordinates.append(self.contour.ravel())
+
+    def save(self, file_name):
+        """ Saves finger positions and coordinates of contour neurons as npz file. """
+        np.savez(file_name, X=np.array(self.finger_positions), Y=np.array(self.contour_coordinates))
 
     def _extract_contours(self, img, num_label=0):
         """ Get external contour from image and show in screen. """
         im2, contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        print("number of contours = ", len(contours))
+        #print("number of contours = ", len(contours))
         imc = np.zeros(im2.shape)
         cnt = max(contours, key=len)
         cv2.drawContours(imc, [cnt], 0, 255, 1)
-        # cv2.drawContours(imc, contours, -1, 255, 1)
-        cv2.imshow('Contour', imc)
-        cv2.moveWindow('Contour', 3 * img.shape[1], num_label * (img.shape[0] + Y_SHIFT))
         cnt = cnt[:,0,:]
         #print(cnt, type(cnt), cnt.shape)
         return cnt, imc
@@ -127,9 +139,8 @@ class FingerMaterialTracker:
         gng.draw(imc)
         gng_contour = gng.contour()
         #print(gng_contour)
-        cv2.imshow('Contour', imc)
-        if cv2.waitKey() & 0xFF == ord('q'):
-            sys.exit(-1)
+        cv2.imshow('Contour ' + str(self.material_num_label), imc)
+        cv2.moveWindow('Contour ' + str(self.material_num_label), 3 * imc.shape[1], self.material_num_label * (imc.shape[0] + Y_SHIFT))
         return gng_contour
 
     def _draw_ng(self, img):
@@ -139,25 +150,36 @@ class FingerMaterialTracker:
         for i, coord in enumerate(contour):
             cv2.circle(img, tuple(coord), 3, 255, 1)
             cv2.line(img, tuple(coord), tuple(contour[(i+1)%num_coords]), 255, 2)
-        cv2.imshow('Contour', img)
+        cv2.imshow('Contour ' + str(self.material_num_label), img)
 
-    def _track_material(self, img, num_label=0):
+    def _track_material(self, img):
         """ Use NG to track deformable material. """
         print("Tracking material...")
-        pixel_contour, imc = self._extract_contours(img, num_label)
+        pixel_contour, imc = self._extract_contours(img, self.material_num_label)
         NG.adapt_NG(self.contour, pixel_contour, **neural_gas_params)
         self._draw_ng(imc)
+
+    def _track_finger(self, img):
+        """ Detects row, column position of finger. """
+        pixel_contour, imc = self._extract_contours(img, self.finger_num_label)
+        coords = np.mean(pixel_contour, 0)
+        self.finger_position = coords
+        #print(coords)
+        cv2.circle(imc, tuple(coords.astype(int)), 3, 255, 1)
+        cv2.imshow('Contour ' + str(self.finger_num_label), imc)
 
     def _track_objects(self, contour_imgs):
         """ Function specific to the problem of tracking the finger and material
         pushed by the robot. """
-        self._track_material(contour_imgs[0])
+        self._track_material(contour_imgs[self.material_num_label])
+        self._track_finger(contour_imgs[self.finger_num_label])
 
 
 def track(cap, param_suit, TrackerClass):
     """ Use NG to track contours"""
     grays = GNG.cluster_colours(num_objects + 1)[param_suit['color_indices']]
     loss_threshold = param_suit['loss_threshold']
+    save_file = param_suit['file_save']
 
     tracker = None
     num_frame = 1
@@ -210,6 +232,8 @@ def track(cap, param_suit, TrackerClass):
         num_frame += 1
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
+
+    tracker.save(save_file)
 
 
 def print_usage(script_name):
