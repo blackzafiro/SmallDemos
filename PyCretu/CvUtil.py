@@ -1,6 +1,7 @@
 import cv2
 import sys
 
+
 def showChannels(img, ypos = 0, wait=False):
     """ Shows a window with the values in every channel of img. """
     num_channels = img.shape[2] if len(img.shape) == 3 else 1

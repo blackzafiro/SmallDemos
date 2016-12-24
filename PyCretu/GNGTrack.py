@@ -44,6 +44,7 @@ param_suits = {
                      'sobel_kernel_size': 1}
 }
 
+
 def get_objects(img, grays, loss_threshold):
     """
     Creates images with background in black and object in white
@@ -106,16 +107,16 @@ class FingerMaterialTracker:
 
         self.contour = self._init_material(contour_imgs[self.material_num_label])
 
-        self.finger_positions = [self.finger_position]
-        self.contour_coordinates = [self.contour.ravel()]
+        self.finger_positions = [self.finger_position.copy()]
+        self.contour_coordinates = [self.contour.copy().ravel()]
         if cv2.waitKey() & 0xFF == ord('q'):
             sys.exit(-1)
 
     def process(self, contour_imgs):
         """ Tracks finger and material, gathering required information. """
         self._track_objects(contour_imgs)
-        self.finger_positions.append(self.finger_position)
-        self.contour_coordinates.append(self.contour.ravel())
+        self.finger_positions.append(self.finger_position.copy())
+        self.contour_coordinates.append(self.contour.copy().ravel())
 
     def save(self, file_name):
         """ Saves finger positions and coordinates of contour neurons as npz file. """
