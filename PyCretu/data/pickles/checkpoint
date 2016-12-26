@@ -1,2 +1,2 @@
-model_checkpoint_path: "sponge_ff.ckpt"
-all_model_checkpoint_paths: "sponge_ff.ckpt"
+model_checkpoint_path: "plasticine_ff.ckpt"
+all_model_checkpoint_paths: "plasticine_ff.ckpt"

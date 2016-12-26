@@ -38,10 +38,54 @@ neural_gas_params = {'epsilon': 0.05,
 param_suits = {
     'sponge_set_1': {'file_video': 'data/generated_videos/sponge_centre_100__filterless_segmented.avi',
                      'file_save': 'data/pickles/sponge_set_1_track',
-                     'color_indices':[0,1,2],   # color in pos 0 is background
-                     'loss_threshold':25,
+                     'train': False,
+                     'file_initial_contour':'data/pickles/sponge_initial_contour.csv',
+                     'color_indices': [0,1,2],   # color in pos 0 is background
+                     'loss_threshold': 25,
                      'median_kernel_size': 7,
-                     'sobel_kernel_size': 1}
+                     'sobel_kernel_size': 1},
+    'sponge_set_2': {'file_video': 'data/generated_videos/sponge_longside_100__filterless_segmented.avi',
+                     'file_save': 'data/pickles/sponge_set_2_track',
+                     'train': False,
+                     'file_initial_contour':'data/pickles/sponge_initial_contour.csv',
+                     'color_indices': [0,1,2],   # color in pos 0 is background
+                     'loss_threshold': 25,
+                     'median_kernel_size': 7,
+                     'sobel_kernel_size': 1
+                     },
+    'sponge_set_3': {'file_video': 'data/generated_videos/sponge_shortside_100__filterless_segmented.avi',
+                     'file_save': 'data/pickles/sponge_set_3_track',
+                     'train': False,
+                     'file_initial_contour':'data/pickles/sponge_initial_contour.csv',
+                     'color_indices': [0,1,2],   # color in pos 0 is background
+                     'loss_threshold': 25,
+                     'median_kernel_size': 7,
+                     'sobel_kernel_size': 1
+                     },
+    'plasticine_set_1': {'file_video': 'data/generated_videos/a_plasticine_centre_100__filterless_segmented.avi',
+                         'file_save': 'data/pickles/plasticine_set_1_track',
+                         'train': False,
+                         'file_initial_contour':'data/pickles/plasticine_initial_contour.csv',
+                         'color_indices': [1,0,2],   # color in pos 0 is background
+                         'loss_threshold': 25,
+                         'median_kernel_size': 9,
+                         'sobel_kernel_size': 1},
+    'plasticine_set_2': {'file_video': 'data/generated_videos/a_plasticine_longside_100__filterless_segmented.avi',
+                         'file_save': 'data/pickles/plasticine_set_2_track',
+                         'train': False,
+                         'file_initial_contour':'data/pickles/plasticine_initial_contour.csv',
+                         'color_indices': [1,0,2],   # color in pos 0 is background
+                         'loss_threshold': 25,
+                         'median_kernel_size': 9,
+                         'sobel_kernel_size': 1},
+    'plasticine_set_3': {'file_video': 'data/generated_videos/a_plasticine_shortside_100__filterless_segmented.avi',
+                         'file_save': 'data/pickles/plasticine_set_3_track',
+                         'train': False,
+                         'file_initial_contour':'data/pickles/plasticine_initial_contour.csv',
+                         'color_indices': [1,0,2],   # color in pos 0 is background
+                         'loss_threshold': 25,
+                         'median_kernel_size': 9,
+                         'sobel_kernel_size': 1}
 }
 
 
@@ -99,13 +143,13 @@ class FingerMaterialTracker:
     material_num_label = 0
     finger_num_label = 1
 
-    def __init__(self, contour_imgs):
+    def __init__(self, contour_imgs, file_initial_contour, train=True):
         """ Initializes tracker data. """
         finger_image = contour_imgs[self.finger_num_label]
         self._track_finger(finger_image)
         cv2.moveWindow('Contour ' + str(self.finger_num_label), 3 * finger_image.shape[1], self.finger_num_label * (finger_image.shape[0] + Y_SHIFT))
 
-        self.contour = self._init_material(contour_imgs[self.material_num_label])
+        self.contour = self._init_material(contour_imgs[self.material_num_label], file_initial_contour, train)
 
         self.finger_positions = [self.finger_position.copy()]
         self.contour_coordinates = [self.contour.copy().ravel()]
@@ -114,9 +158,10 @@ class FingerMaterialTracker:
 
     def process(self, contour_imgs):
         """ Tracks finger and material, gathering required information. """
-        self._track_objects(contour_imgs)
+        imgs = self._track_objects(contour_imgs)
         self.finger_positions.append(self.finger_position.copy())
         self.contour_coordinates.append(self.contour.copy().ravel())
+        return imgs
 
     def save(self, file_name):
         """ Saves finger positions and coordinates of contour neurons as npz file. """
@@ -127,18 +172,26 @@ class FingerMaterialTracker:
         im2, contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         #print("number of contours = ", len(contours))
         imc = np.zeros(im2.shape)
-        cnt = max(contours, key=len)
-        cv2.drawContours(imc, [cnt], 0, 255, 1)
-        cnt = cnt[:,0,:]
+        if contours != []:
+            cnt = max(contours, key=len)
+            cv2.drawContours(imc, [cnt], 0, 255, 1)
+            cnt = cnt[:,0,:]
+        else:
+            cnt = np.array([])
         #print(cnt, type(cnt), cnt.shape)
         return cnt, imc
 
-    def _init_material(self, material_contour_img):
+    def _init_material(self, material_contour_img, file_initial_contour, train):
         """ Creates and returns initial contour approximation with GNG. """
         contour, imc = self._extract_contours(material_contour_img, self.material_num_label)
-        gng = GNG.calibrate_tracking_GNG(contour, tracking_params)
-        gng.draw(imc)
-        gng_contour = gng.contour()
+        gng_contour = None
+        if train:
+            gng = GNG.calibrate_tracking_GNG(contour, tracking_params)
+            gng.draw(imc)
+            gng_contour = gng.contour()
+            np.savetxt(file_initial_contour, gng_contour)
+        else:
+            gng_contour = np.loadtxt(file_initial_contour)
         #print(gng_contour)
         cv2.imshow('Contour ' + str(self.material_num_label), imc)
         cv2.moveWindow('Contour ' + str(self.material_num_label), 3 * imc.shape[1], self.material_num_label * (imc.shape[0] + Y_SHIFT))
@@ -159,21 +212,31 @@ class FingerMaterialTracker:
         pixel_contour, imc = self._extract_contours(img, self.material_num_label)
         NG.adapt_NG(self.contour, pixel_contour, **neural_gas_params)
         self._draw_ng(imc)
+        return imc
 
     def _track_finger(self, img):
         """ Detects row, column position of finger. """
         pixel_contour, imc = self._extract_contours(img, self.finger_num_label)
-        coords = np.mean(pixel_contour, 0)
+        if pixel_contour != np.array([]):
+            coords = np.mean(pixel_contour, 0)
+        else:
+            coords = np.array([-1, -1], np.float32)
         self.finger_position = coords
         #print(coords)
-        cv2.circle(imc, tuple(coords.astype(int)), 3, 255, 1)
+        #try:
+        #    cv2.circle(imc, tuple(coords.astype(int)), 3, 255, 1)
+        #except TypeError:
+        #    print("Finger is gone")
+        #    coords = np.array([-1,-1], np.float32)
         cv2.imshow('Contour ' + str(self.finger_num_label), imc)
+        return imc
 
     def _track_objects(self, contour_imgs):
         """ Function specific to the problem of tracking the finger and material
         pushed by the robot. """
-        self._track_material(contour_imgs[self.material_num_label])
-        self._track_finger(contour_imgs[self.finger_num_label])
+        imm = self._track_material(contour_imgs[self.material_num_label])
+        imf = self._track_finger(contour_imgs[self.finger_num_label])
+        return imm, imf
 
 
 def track(cap, param_suit, TrackerClass):
@@ -198,7 +261,7 @@ def track(cap, param_suit, TrackerClass):
         for i, img in enumerate(images):
             dsts.append(detect_borders(img, param_suit, i))
 
-        tracker = TrackerClass(dsts)
+        tracker = TrackerClass(dsts, param_suit['file_initial_contour'], param_suit['train'])
 
         print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
 
@@ -224,23 +287,32 @@ def track(cap, param_suit, TrackerClass):
         for i, img in enumerate(images):
             dsts.append(detect_borders(img, param_suit, i))
 
-        tracker.process(dsts)
+        imgs = tracker.process(dsts)
 
         print("--- %s seconds to process frame %d ---" % ((time.time() - start_time), num_frame))
 
 
         print("Frame ", num_frame)
         num_frame += 1
-        if cv2.waitKey(10) & 0xFF == ord('q'):
+        #if cv2.waitKey(10) & 0xFF == ord('q'):
+        #    break
+        key = cv2.waitKey(5) & 0xFF
+        if key == ord('q'):
             break
+        if key == ord('s'):
+            img = cv2.addWeighted(imgs[0], 1, imgs[1], 1, 0.0)
+            cv2.imwrite(param_suit['file_video'] + '.jpg', img)
 
     tracker.save(save_file)
 
 
 def print_usage(script_name):
     """Print script instructions."""
-    print('Usage: ' + script_name + ' <param_set>')
+    print("Use: " + sys.argv[0] + " <set_of_paramteres>\nOptions:")
+    for key in param_suits.keys():
+        print('\t', key)
     sys.exit(1)
+
 
 if __name__ == '__main__':
     nargs = len(sys.argv)

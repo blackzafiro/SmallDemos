@@ -26,15 +26,68 @@ param_suits = {
         'file_restore': 'data/pickles/sponge_ff.ckpt',
         'file_predictions': 'data/pickles/sponge_center_predictions.csv',
         'file_video': 'data/generated_videos/sponge_centre_100__filterless_segmented.avi',
+        'hidden_neurons': 50,
         'learning_rate': (0.03, 0.005, 0.003),
         'momentum': (0.01, 0.003, 0.001),
         'train_epochs': (50, 4000, 6000),
-        'roi_shape': (600, 500),
         'force_norm': 3.5,
         'pixel_norm': 600.0
     },
     'sponge_set_2': {
-        'train': False
+        'train': False,
+        'file_train_data': 'data/pickles/sponge_set_2_track.npz',
+        'file_force_data': 'data/original/sponge_longside_100.txt',
+        'file_restore': 'data/pickles/sponge_ff.ckpt',
+        'file_predictions': 'data/pickles/sponge_longside_predictions.csv',
+        'file_video': 'data/generated_videos/sponge_longside_100__filterless_segmented.avi',
+        'force_norm': 3.5,
+        'pixel_norm': 600.0
+    },
+    'sponge_set_3': {
+        'train': False,
+        'file_train_data': 'data/pickles/sponge_set_3_track.npz',
+        'file_force_data': 'data/original/sponge_shortside_100.txt',
+        'file_restore': 'data/pickles/sponge_ff.ckpt',
+        'file_predictions': 'data/pickles/sponge_shortside_predictions.csv',
+        'file_video': 'data/generated_videos/sponge_shortside_100__filterless_segmented.avi',
+        'force_norm': 3.5,
+        'pixel_norm': 600.0
+    },
+    'plasticine_set_1': {
+        'train': True,
+        'file_train_data': 'data/pickles/plasticine_set_1_track.npz',
+        'file_force_data': 'data/original/plasticine_centre_100_below.txt',
+        'file_restore': 'data/pickles/plasticine_ff.ckpt',
+        'file_predictions': 'data/pickles/plasticine_center_predictions.csv',
+        'file_video': 'data/generated_videos/a_plasticine_centre_100__filterless_segmented.avi',
+        'hidden_neurons': 70,
+        'learning_rate': (0.03, 0.03, 0.007, 0.003),
+        'momentum': (0.03, 0.01, 0.005, 0.001),
+        'train_epochs': (100, 4000, 10000, 10000),
+        'force_norm': 3.5,
+        'pixel_norm': 600.0
+    },
+    'plasticine_set_2': {
+        'train': False,
+        'file_train_data': 'data/pickles/plasticine_set_2_track.npz',
+        'file_force_data': 'data/original/plasticine_longside_100_below.txt',
+        'file_restore': 'data/pickles/plasticine_ff.ckpt',
+        'file_predictions': 'data/pickles/plasticine_longside_predictions.csv',
+        'file_video': 'data/generated_videos/plasticine_longside_100__filterless_segmented.avi',
+        'hidden_neurons': 70,
+        'force_norm': 3.5,
+        'pixel_norm': 600.0
+    },
+    'plasticine_set_3': {
+        'train': False,
+        'file_train_data': 'data/pickles/plasticine_set_3_track.npz',
+        'file_force_data': 'data/original/plasticine_shortside_100_below.txt',
+        'file_restore': 'data/pickles/plasticine_ff.ckpt',
+        'file_predictions': 'data/pickles/plasticine_shortside_predictions.csv',
+        'file_video': 'data/generated_videos/plasticine_shortside_100__filterless_segmented.avi',
+        'hidden_neurons': 70,
+        'force_norm': 3.5,
+        'pixel_norm': 600.0
     }
 }
 
@@ -177,10 +230,18 @@ def train(param_suit):
 
     # Create and train or restore FFnn.
     nn = None
-    num_neurons = [3, 50, Y.shape[1]]
+    num_neurons = [3, param_suit['hidden_neurons'], Y.shape[1]]
     if not param_suit['train'] and tf.gfile.Exists(param_suit['file_restore']):
         print_msg("Restoring trained neural network...")
-        nn = FFDeformation(num_neurons, param_suit['file_restore'])
+        nn = FFDeformation(num_neurons, (param_suit['pixel_norm'],
+                                         param_suit['pixel_norm'],
+                                         param_suit['force_norm']), param_suit['file_restore'])
+
+        b_save = input("Do you want to save the predicted contour? [y/n] ")
+        if b_save == 'y':
+            predictions = nn.feed_forward(X)
+            np.savetxt(param_suit['file_predictions'], predictions)
+            print_msg("Predictions saved.")
     else:
         print_msg("Creating feedforward neural network...", num_neurons)
         nn = FFDeformation(num_neurons, (param_suit['pixel_norm'],
@@ -190,17 +251,19 @@ def train(param_suit):
         #print("Y = ", nn.feed_forward(X))
 
         cont = "y"
+        error = nn.evaluate(X, Y)
+        print_msg("Initial error = ", error)
         for learning_rate, momentum, train_epochs in zip(param_suit['learning_rate'],
                                                          param_suit['momentum'],
                                                          param_suit['train_epochs']):
+            #cont = input("Do you want to continue? [y/n] ")
+            #if cont == "n": break
             print_msg("Training...")
             nn.train(X_train, Y_train, X_val, Y_val, learning_rate, momentum, train_epochs)
 
             print_msg("Evaluating...")
             error = nn.evaluate(X, Y)
             print_msg("Error on training set = ", error)
-            #cont = input("Do you want to continue? [y/n] ")
-            #if cont == "n": break
 
         if cont != "n":
             b_save = input("Do you want to save the network? [y/n] ")
@@ -218,6 +281,7 @@ def load_data(track_file, force_file):
     X = npzfile['X']
     Y = npzfile['Y']
     X2 = np.loadtxt(force_file)[:,3:4]  # Want Tz on column 3
+    print_msg("Finger data shapes: ", X.shape, X2.shape)
     X = np.hstack((X,X2))
     return X, Y
 
