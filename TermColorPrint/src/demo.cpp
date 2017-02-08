@@ -2,7 +2,7 @@
 #include "TermColorPrint.h"
 
 int main() {
-    PrettyPrint::ColorPrinter cp(std::cout, PrettyPrint::Cyan, PrettyPrint::BNone, PrettyPrint::Bold);
+    PrettyPrint::ColorPrinter cp(std::cout, PrettyPrint::Cyan, PrettyPrint::BDefault, PrettyPrint::Bold);
     cp << "Some outstanding color, like heavy cyan. " << 15 << std::endl;
     PrettyPrint::ColorPrinter cp2(std::cout, PrettyPrint::Red, PrettyPrint::BWhite);
     cp2 << "Red is useful for errors, " << 100 << std::endl;

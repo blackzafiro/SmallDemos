@@ -6,15 +6,9 @@ namespace PrettyPrint {
         stm(stm){
         std::ostringstream stringStream;
         stringStream << "\x1b[";
-        if (attr != ANone) {
-            stringStream << attr;
-        } else {
-            stringStream << 0;
-        }
+        stringStream << attr;
         stringStream << ";" << color;
-        if (bcolor != BNone) {
-            stringStream << ";" << bcolor;
-        }
+        stringStream << ";" << bcolor;
         stringStream << "m";
         cini = stringStream.str();
     }
