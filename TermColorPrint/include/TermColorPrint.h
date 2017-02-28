@@ -4,10 +4,7 @@
 #define __TERM_COLOR_PRINT_H_
 
 namespace PrettyPrint {
-    /** Red */
-    const std::string RED = "\e[0;31m";
-    /** Cyan */
-    const std::string CYAN = "\e[0;36m";
+
     /** Color end */
     const std::string CEND = "\e[0m";
 
