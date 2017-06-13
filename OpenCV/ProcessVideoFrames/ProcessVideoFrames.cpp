@@ -137,7 +137,8 @@ int main(int argc, const char* argv[])
 			std::cout << "Custom kernel function only works with RGBA videos decoded to CV_8UC4" << std::endl;
 		}
 
-		if (cv::waitKey(3) > 0)
+
+        if (cv::waitKey(3) == 'q')
 			break;
 
 	}

@@ -7,6 +7,7 @@ LDFLAGS =
 
 GPUXX = nvcc
 GPUXXFLAGS = -c -v
+CUDA_HOME = /usr/local/cuda
 
 # Fuentes
 SOURCE = GpuDraw.cpp
@@ -21,14 +22,14 @@ EXEC = GpuDraw
 OBJ_CU = gpuDraw
 
 # OpenCV location
-OPENCV_HOME=/home/blackzafiro/Descargas/Programacion/opencv/opencv-3.1.0/build
+OPENCV_HOME=/home/blackzafiro/Descargas/Desarrollo/OpenCV/opencv-3.2.0/build
 
 export PKG_CONFIG_PATH:=$(PKG_CONFIG_PATH):$(OPENCV_HOME)/lib/pkgconfig
 
 # OpenCV
 CPPFLAGS += `pkg-config --cflags opencv`
 GPUXXFLAGS += `pkg-config --cflags opencv`
-CV_LIB = -L$(OPENCV_HOME)/share/OpenCV/3rdparty/lib
+CV_LIB = -L$(OPENCV_HOME)/share/OpenCV/3rdparty/lib -L$(CUDA_HOME)/lib64
 LDFLAGS += `pkg-config --libs opencv` $(CV_LIB) -lcudart
 
 all: $(SOURCES) $(EXEC)

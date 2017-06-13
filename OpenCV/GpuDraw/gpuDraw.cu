@@ -16,8 +16,8 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 }
 
 
- __global__ void gpuNumDifferentKernel(cv::cuda::PtrStepSz<uchar3> img,
-								cv::Point* d_pt1, cv::Point* d_pt2,
+ __global__ void gpuLineKernel(cv::cuda::PtrStepSz<uchar3> img,
+								cv::Point* d_pt1, cv::Point* d_pt2, double m,
 								cv::Scalar* d_color)
 {
 	int blockId = blockIdx.x + blockIdx.y * gridDim.x; 
@@ -25,7 +25,7 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	img(y, x).x = 100;
+	img(y, x).x = 255;
 }
 
 
@@ -58,7 +58,7 @@ int gpuLine(cv::InputArray _img, cv::Point pt1, cv::Point pt2, const cv::Scalar&
 
 	cv::cuda::Stream _stream = cv::cuda::Stream();
 	cudaStream_t stream = cv::cuda::StreamAccessor::getStream(_stream);
-	gpuNumDifferentKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img, d_pt1, d_pt2, d_color);
+	gpuLineKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img, d_pt1, d_pt2, d_color);
 
 	gpuErrchk( cudaPeekAtLastError() );
 	gpuErrchk( cudaDeviceSynchronize() );
