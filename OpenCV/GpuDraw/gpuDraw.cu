@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/core/cuda_stream_accessor.hpp>
+#include <limits>
 
 
 // http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
@@ -15,17 +16,83 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
    }
 }
 
-
  __global__ void gpuLineKernel(cv::cuda::PtrStepSz<uchar3> img,
-								cv::Point* d_pt1, cv::Point* d_pt2, double m,
-								cv::Scalar* d_color)
+								cv::Point* d_pt1, cv::Point* d_pt2, double m, bool isInf,
+								int b, int g, int r, int alfa, int thickness)
 {
-	int blockId = blockIdx.x + blockIdx.y * gridDim.x; 
+	//int blockId = blockIdx.x + blockIdx.y * gridDim.x;
 
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	img(y, x).x = 255;
+    int min_y = d_pt1->y, max_y = d_pt2->y;
+    if (min_y > max_y) {
+        min_y = max_y;
+        max_y = d_pt1->y;
+    }
+    int min_x = d_pt1->x, max_x = d_pt2->x;
+    if (min_x > max_x) {
+        min_x = max_x;
+        max_x = d_pt1->x;
+    }
+
+    if (isInf) {
+        // Vertical line
+        double diff = x - d_pt1->x;
+        if (y > min_y && y < max_y && sqrt(diff * diff) < thickness) {
+            img(y, x).x = b;
+            img(y, x).y = g;
+            img(y, x).z = r;
+        }
+    } else if (m * m < 0.0001) {
+        // Horizontal line
+        double diff = y - d_pt1->y;
+        if (x > min_x && x < max_x && sqrt(diff * diff) < thickness) {
+            img(y, x).x = b;
+            img(y, x).y = g;
+            img(y, x).z = r;
+        }
+    } else {
+
+        if (y > min_y && y < max_y && x > min_x && x < max_x) {
+            double yy = m * (x - d_pt1->x) + d_pt1->y;
+            double diff = yy - y;
+            if (sqrt(diff * diff) < thickness) {
+                img(y, x).x = b;
+                img(y, x).y = g;
+                img(y, x).z = r;
+            }
+        }
+    }
+
+}
+
+
+__global__ void gpuCircleKernel(cv::cuda::PtrStepSz<uchar3> img,
+                              cv::Point* d_center, int radius,
+                              int b, int g, int r, int alfa, int thickness)
+{
+    //int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    double dx = d_center->x - x;
+    double dy = d_center->y - y;
+
+    if (thickness < 0) {
+        if (sqrt(dx * dx + dy * dy) < radius) {
+            img(y, x).x = b;
+            img(y, x).y = g;
+            img(y, x).z = r;
+        }
+    } else {
+        if (abs(sqrt(dx * dx + dy * dy) - radius) < thickness) {
+            img(y, x).x = b;
+            img(y, x).y = g;
+            img(y, x).z = r;
+        }
+    }
 }
 
 
@@ -33,7 +100,7 @@ inline void gpuAssert(cudaError_t code, const char *file, const char *func, int 
 /*
  * Draw line.  Like cv::line, but in gpumat.
  */
-int gpuLine(cv::InputArray _img, cv::Point pt1, cv::Point pt2, const cv::Scalar& color)
+int gpuLine(cv::InputArray _img, cv::Point pt1, cv::Point pt2, const cv::Scalar& color, int thickness = 1)
 {
 	const cv::cuda::GpuMat img = _img.getGpuMat();
 
@@ -46,26 +113,66 @@ int gpuLine(cv::InputArray _img, cv::Point pt1, cv::Point pt2, const cv::Scalar&
 
 	cv::Point *d_pt1;
 	cv::Point *d_pt2;
-	cv::Scalar *d_color;
+	double m;
+    bool isInf = false;
+
+    if ((pt2.x - pt1.x) * (pt2.x - pt1.x) > 0.0001) {
+        m = (pt2.y - pt1.y) / (pt2.x - pt1.x);
+    } else {
+        m = std::numeric_limits<double>::infinity();
+        isInf = true;
+    }
+
 
 	gpuErrchk( cudaMalloc((void**)&d_pt1, sizeof(cv::Point)) );
 	gpuErrchk( cudaMalloc((void**)&d_pt2, sizeof(cv::Point)) );
-	gpuErrchk( cudaMalloc((void**)&d_color, sizeof(cv::Scalar)) );
 
 	gpuErrchk( cudaMemcpy((void*)d_pt1, (void*)&pt1, sizeof(cv::Point), cudaMemcpyHostToDevice) );
 	gpuErrchk( cudaMemcpy((void*)d_pt2, (void*)&pt2, sizeof(cv::Point), cudaMemcpyHostToDevice) );
-	gpuErrchk( cudaMemcpy((void*)d_color, (void*)&color, sizeof(cv::Scalar), cudaMemcpyHostToDevice) );
 
 	cv::cuda::Stream _stream = cv::cuda::Stream();
 	cudaStream_t stream = cv::cuda::StreamAccessor::getStream(_stream);
-	gpuLineKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img, d_pt1, d_pt2, d_color);
+	gpuLineKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img, d_pt1, d_pt2, m, isInf, color[0], color[1], color[2], color[3], thickness);
 
 	gpuErrchk( cudaPeekAtLastError() );
 	gpuErrchk( cudaDeviceSynchronize() );
 
 	cudaFree(d_pt1);
 	cudaFree(d_pt2);
-	cudaFree(d_color);
 
 	return 0;
+}
+
+
+
+/*
+ * Draw circle.  Like cv::line, but in gpumat.
+ */
+int gpuCircle(cv::InputArray _img, cv::Point center, int radius, const cv::Scalar& color, int thickness = 1)
+{
+    const cv::cuda::GpuMat img = _img.getGpuMat();
+
+    dim3 cthreads_blockDim(32, 32);
+    dim3 cblocks_gridDim(
+            static_cast<int>(std::ceil(img.size().width /
+                                       static_cast<double>(cthreads_blockDim.x))),
+            static_cast<int>(std::ceil(img.size().height /
+                                       static_cast<double>(cthreads_blockDim.y))));
+
+    cv::Point *d_center;
+
+    gpuErrchk( cudaMalloc((void**)&d_center, sizeof(cv::Point)) );
+
+    gpuErrchk( cudaMemcpy((void*)d_center, (void*)&center, sizeof(cv::Point), cudaMemcpyHostToDevice) );
+
+    cv::cuda::Stream _stream = cv::cuda::Stream();
+    cudaStream_t stream = cv::cuda::StreamAccessor::getStream(_stream);
+    gpuCircleKernel<<<cblocks_gridDim, cthreads_blockDim, 0, stream>>>(img, d_center, radius, color[0], color[1], color[2], color[3], thickness);
+
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
+
+    cudaFree(d_center);
+
+    return 0;
 }

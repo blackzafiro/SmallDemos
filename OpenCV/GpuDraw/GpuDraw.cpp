@@ -11,7 +11,8 @@
 
 #include <opencv2/opencv.hpp>
 
-int gpuLine(cv::InputArray _img1, cv::Point pt1, cv::Point pt2, const cv::Scalar& color);
+int gpuLine(cv::InputArray _img1, cv::Point pt1, cv::Point pt2, const cv::Scalar& color, int thickness = 1);
+int gpuCircle(cv::InputArray _img, cv::Point center, int radius, const cv::Scalar& color, int thickness = 1);
 
 int main(int argc, const char* argv[])
 {
@@ -34,8 +35,14 @@ int main(int argc, const char* argv[])
 	d_img.setTo(cv::Scalar::all(0));
 	//cv::circle(d_img, cv::Point(250,250), 50, cv::Scalar(25,67,100));
 	//cv::line(d_img, cv::Point(250,250), cv::Point(250,300), cv::Scalar(25,67,100));
-	gpuLine(d_img, cv::Point(250,250), cv::Point(250,300), cv::Scalar(25,67,100));
+	gpuLine(d_img, cv::Point(250,250), cv::Point(250,300), cv::Scalar(25,67,100), 5);
+	gpuLine(d_img, cv::Point(50,25), cv::Point(250,300), cv::Scalar(255,0,0));
+	gpuLine(d_img, cv::Point(50,25), cv::Point(250,600), cv::Scalar(0,255,0), 2);
+    gpuLine(d_img, cv::Point(500,25), cv::Point(2,600), cv::Scalar(0,0,255), 8);
+    gpuLine(d_img, cv::Point(400,300), cv::Point(25,300), cv::Scalar(250,67,100), 5);
 
+    gpuCircle(d_img, cv::Point(400,350), 30, cv::Scalar(250,80,150), -3);
+    gpuCircle(d_img, cv::Point(100,300), 30, cv::Scalar(250,80,150), 6);
     cv::imshow("GPU", d_img);
 
 	cvWaitKey(0);
