@@ -13,6 +13,7 @@
 
 int gpuLine(cv::InputArray _img1, cv::Point pt1, cv::Point pt2, const cv::Scalar& color, int thickness = 1);
 int gpuCircle(cv::InputArray _img, cv::Point center, int radius, const cv::Scalar& color, int thickness = 1);
+int gpuFillTriangle(cv::InputArray _img, cv::Point pt1, cv::Point pt2, cv::Point pt3, const cv::Scalar& color, int thickness = 1);
 
 int main(int argc, const char* argv[])
 {
@@ -35,6 +36,10 @@ int main(int argc, const char* argv[])
 	d_img.setTo(cv::Scalar::all(0));
 	//cv::circle(d_img, cv::Point(250,250), 50, cv::Scalar(25,67,100));
 	//cv::line(d_img, cv::Point(250,250), cv::Point(250,300), cv::Scalar(25,67,100));
+	
+	gpuFillTriangle(d_img, cv::Point(150,50), cv::Point(450,250), cv::Point(250,250), cv::Scalar(25,67,100));
+	gpuFillTriangle(d_img, cv::Point(150,250), cv::Point(250,450), cv::Point(450,450), cv::Scalar(125,167,255));
+			
 	gpuLine(d_img, cv::Point(250,250), cv::Point(250,300), cv::Scalar(25,67,100), 5);
 	gpuLine(d_img, cv::Point(50,25), cv::Point(250,300), cv::Scalar(255,0,0));
 	gpuLine(d_img, cv::Point(50,25), cv::Point(250,600), cv::Scalar(0,255,0), 2);
