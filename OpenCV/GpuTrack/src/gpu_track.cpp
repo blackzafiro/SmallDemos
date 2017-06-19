@@ -1,3 +1,5 @@
+#define DEBUG_SHOW
+
 #include <iostream>
 #include <string>
 
@@ -12,7 +14,6 @@
 
 #include <opencv2/core.hpp>
 #include <opencv2/core/opengl.hpp>
-//#include <opencv2/core/cuda.hpp>
 #include <opencv2/cudacodec.hpp>
 #include <opencv2/highgui.hpp>
 
@@ -20,6 +21,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/cudaarithm.hpp>
 #include <opencv2/cudaimgproc.hpp>
+
+#include "linear_tracker.hpp"
 
 /**
  * Prints opencv type
@@ -76,8 +79,62 @@ std::ostream& operator<<(std::ostream& out, const cv::cudacodec::Codec value){
     return out << s;
 }
 
+struct MedianParams
+{
+	int window_size;
+	int partition;
+} median_params;
+
+struct SobelParams
+{
+	int srcType;
+	int dstType;
+	int dx;				// Derivative order in respect of x.
+	int dy;				// Derivative order in respect of y.
+	int ksize;		// Size of the extended Sobel kernel. Possible values are 1, 3, 5 or 7.
+	double scale;		// Optional scale factor for the computed derivative values.
+} sobel_params;
+
+struct CannyParams
+{
+	double low_thresh;
+	double high_thresh;
+	int apperture_size;
+} canny_params;
+
+struct LinearSnakeParams
+{
+	int maxDistance;
+	int minDistance;
+	int minAngle;
+	int rings;
+} lsnake_params;
+
+
+
 int main(int argc, const char* argv[])
 {
+	median_params.window_size = 20;
+	median_params.partition = 128; // default value
+	
+	sobel_params.srcType = CV_32F;//CV_8UC1; //CV_64FC1; //CV_8UC1;
+	sobel_params.dstType = CV_32F; //CV_8UC1; //CV_64FC1; //CV_8UC1;
+	sobel_params.dx = 1;
+	sobel_params.dy = 1;
+	sobel_params.ksize = 5;
+	sobel_params.scale = 1;		// Default value, no scaling.
+	
+	canny_params.low_thresh = 2.0;
+	canny_params.high_thresh = 200.0;
+	canny_params.apperture_size = 5;
+	
+	lsnake_params.maxDistance = 14;
+	lsnake_params.minDistance = 6;
+	lsnake_params.minAngle = 33;
+	lsnake_params.rings = 21;
+	
+	bool use_sobel = false;
+
 	// Test if cuda device is present
 
 	int idev = cv::cuda::getCudaEnabledDeviceCount();
@@ -92,7 +149,8 @@ int main(int argc, const char* argv[])
 	const std::string fname(argv[1]);
 
 	cv::namedWindow("GPU", cv::WINDOW_OPENGL);  cv::moveWindow("GPU", 10, 50);
-	cv::namedWindow("Mod", cv::WINDOW_OPENGL);  cv::moveWindow("Mod", 500, 50);
+	cv::namedWindow("Blur", cv::WINDOW_OPENGL);  cv::moveWindow("Blur", 500, 50);
+	cv::namedWindow("Mod", cv::WINDOW_OPENGL);  cv::moveWindow("Mod", 1000, 50);
 	cv::cuda::setGlDevice();
 
 	// Ask if device is compatible
@@ -103,15 +161,45 @@ int main(int argc, const char* argv[])
 
 	cv::cuda::GpuMat d_frame;
 	cv::Ptr<cv::cudacodec::VideoReader> d_reader = cv::cudacodec::createVideoReader(fname);
-	cv::cuda::GpuMat d_dst;
+	cv::cuda::GpuMat d_blur, d_dst;
 
 	cv::cudacodec::FormatInfo formatInfo = d_reader->format();
 	std::cout << formatInfo.width << "x" << formatInfo.height << " codec:" << formatInfo.codec << std::endl;
+	
+	cv::Ptr<cv::cuda::Filter> median_blur = cv::cuda::createMedianFilter (CV_8UC1,
+											median_params.window_size,
+											median_params.partition);
 
-	int ratio = 3;
-	int kernel_size = 3;
-	cv::Ptr<cv::cuda::CannyEdgeDetector> canny_edg =
-			cv::cuda::createCannyEdgeDetector(2.0, 100.0, 3, false);  
+	cv::Ptr<cv::cuda::Filter> sobel_edg_x, sobel_edg_y;
+	cv::cuda::GpuMat d_float, d_sobel_x, d_sobel_y;
+	
+	cv::Ptr<cv::cuda::CannyEdgeDetector> canny_edg;
+	if (use_sobel)
+	{
+		std:: cout << "+++ Using sobel" << std::endl;
+		sobel_edg_x = cv::cuda::createSobelFilter(
+				sobel_params.srcType,
+				sobel_params.dstType,
+				sobel_params.dx,
+				sobel_params.dy,
+				sobel_params.ksize,
+				sobel_params.scale);
+		sobel_edg_y = cv::cuda::createSobelFilter(
+				sobel_params.srcType,
+				sobel_params.dstType,
+				sobel_params.dx,
+				sobel_params.dy,
+				sobel_params.ksize,
+				sobel_params.scale);
+		std:: cout << "+++ Using sobel created..." << std::endl;
+	}
+	else
+	{
+		std:: cout << "+++ Using canny" << std::endl;
+		canny_edg = cv::cuda::createCannyEdgeDetector(canny_params.low_thresh,
+				canny_params.high_thresh,
+				canny_params.apperture_size, false);
+	}
 
 	int nframe = 0;
 	int ndiff = 0;
@@ -122,12 +210,31 @@ int main(int argc, const char* argv[])
 			break;
 		cv::imshow("GPU", d_frame);
 
-		cv::cuda::cvtColor(d_frame, d_dst, CV_BGRA2GRAY);
+		cv::cuda::cvtColor(d_frame, d_blur, CV_BGRA2GRAY);
 		
-		//gpu::blur(d_greyscale, d_blurred, Size(3, 3));
+		median_blur->apply(d_blur, d_blur);
+#ifdef DEBUG_SHOW
+		cv::imshow("Blur", d_blur);
+#endif
 		
 		// http://docs.opencv.org/3.2.0/d0/d05/group__cudaimgproc.html
-		canny_edg->detect(d_dst, d_dst);
+		if (use_sobel)
+		{
+			//A.convertTo(B,CV_8U,255.0/(Max-Min),-255.0*Min/(Max-Min));
+			d_blur.convertTo(d_float, CV_32F);
+			
+			sobel_edg_x->apply(d_float, d_sobel_x);
+			sobel_edg_y->apply(d_float, d_sobel_y);
+			cv::cuda::abs(d_sobel_x, d_sobel_x);
+			cv::cuda::abs(d_sobel_y, d_sobel_y);
+			cv::cuda::addWeighted(d_sobel_x, 0.5, d_sobel_y, 0.5, 0, d_float);
+			cv::cuda::abs(d_float, d_float);
+			d_float.convertTo(d_dst, CV_8UC1);
+		}
+		else
+		{
+			canny_edg->detect(d_blur, d_dst);
+		}
 		cv::imshow("Mod", d_dst);
 
         if (cv::waitKey(10) == 'q')
