@@ -19,14 +19,14 @@ public:
 	/**
 	 * Initialize linear snake
 	 */
-	LinearSplineTracker(int maxDistance, int minDistance, int minAngle, int rings) {};
+	LinearSplineTracker(std::vector<cv::Point>& border_clue, int max_distance, int min_distance, int min_angle, int rings);
 	
 	/**
 	 * Adjust linear spline to edges and save in history.
 	 * @param d_img  Image with edges of the object to track.
 	 * @param d_draw Countour will be drawn in this 4 channel image.
 	 */
-	void track(cv::cuda::GpuMat d_img, cv::cuda::GpuMat d_draw);
+	void track(cv::cuda::GpuMat d_img, cv::cuda::GpuMat d_edges, cv::cuda::GpuMat d_draw);
 	
 	/**
 	 * Writes the history of this tracking session to <code>o</code>.
@@ -35,11 +35,10 @@ public:
 	 */
 	std::ostream& write(std::ostream &o) const;
 	
+	~LinearSplineTracker();
+	
 private:
 	LinearSplineTrackerImpl *impl_;
-	
-	int maxDistance, minDistance, minAngle;
-	int rings;		// The maximum distance to look for an edge in pixels
 };
 
 #endif /* LINEAR_TRACKER_H */

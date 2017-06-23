@@ -104,17 +104,25 @@ struct CannyParams
 
 struct LinearSnakeParams
 {
-	int maxDistance;
-	int minDistance;
-	int minAngle;
+	std::vector<cv::Point> border_clue;
+	int max_distance;
+	int min_distance;
+	int min_angle;
 	int rings;
 } lsnake_params;
 
+struct RoiParams
+{
+	int x1;
+	int y1;
+	int x2;
+	int y2;
+} roi_params;
 
 
 int main(int argc, const char* argv[])
 {
-	median_params.window_size = 20;
+	median_params.window_size = 10;
 	median_params.partition = 128; // default value
 	
 	sobel_params.srcType = CV_32F;//CV_8UC1; //CV_64FC1; //CV_8UC1;
@@ -128,10 +136,25 @@ int main(int argc, const char* argv[])
 	canny_params.high_thresh = 200.0;
 	canny_params.apperture_size = 5;
 	
-	lsnake_params.maxDistance = 14;
-	lsnake_params.minDistance = 6;
-	lsnake_params.minAngle = 33;
+	roi_params.x1 = 375;
+	roi_params.y1 = 150;
+	roi_params.x2 = 850;
+	roi_params.y2 = 675;
+	
+	cv::Rect roi(roi_params.x1, roi_params.y1,
+		roi_params.x2 - roi_params.x1,
+		roi_params.y2 - roi_params.y1);
+	
+	lsnake_params.border_clue = std::vector<cv::Point>();
+	lsnake_params.border_clue.push_back(cv::Point(495 - roi_params.x1, 240 - roi_params.y1));
+	lsnake_params.border_clue.push_back(cv::Point(731 - roi_params.x2, 240 - roi_params.y1));
+	lsnake_params.border_clue.push_back(cv::Point(731 - roi_params.x2, 630 - roi_params.y2));
+	lsnake_params.border_clue.push_back(cv::Point(495 - roi_params.x1, 630 - roi_params.y2));
+	lsnake_params.max_distance = 14;
+	lsnake_params.min_distance = 6;
+	lsnake_params.min_angle = 33;
 	lsnake_params.rings = 21;
+	
 	
 	bool use_sobel = false;
 
@@ -149,8 +172,9 @@ int main(int argc, const char* argv[])
 	const std::string fname(argv[1]);
 
 	cv::namedWindow("GPU", cv::WINDOW_OPENGL);  cv::moveWindow("GPU", 10, 50);
-	cv::namedWindow("Blur", cv::WINDOW_OPENGL);  cv::moveWindow("Blur", 500, 50);
-	cv::namedWindow("Mod", cv::WINDOW_OPENGL);  cv::moveWindow("Mod", 1000, 50);
+	cv::namedWindow("Blur", cv::WINDOW_OPENGL);  cv::moveWindow("Blur", 480, 50);
+	cv::namedWindow("Edges", cv::WINDOW_OPENGL);  cv::moveWindow("Edges", 480, 400);
+	cv::namedWindow("Mod", cv::WINDOW_OPENGL);  cv::moveWindow("Mod", 10, 400);
 	cv::cuda::setGlDevice();
 
 	// Ask if device is compatible
@@ -159,7 +183,10 @@ int main(int argc, const char* argv[])
 	std::cout << "This computer's device compatibility with GlDevice is " << bglcomp << std::endl;
 	if (!bglcomp) return -1;
 
-	cv::cuda::GpuMat d_frame;
+	cv::cuda::GpuMat d_frame, d_roi, d_frame_view;
+#ifdef DEBUG_SHOW
+	cv::cuda::GpuMat d_frame_edges;
+#endif
 	cv::Ptr<cv::cudacodec::VideoReader> d_reader = cv::cudacodec::createVideoReader(fname);
 	cv::cuda::GpuMat d_blur, d_dst;
 
@@ -201,6 +228,13 @@ int main(int argc, const char* argv[])
 				canny_params.apperture_size, false);
 	}
 
+	LinearSplineTracker lspline_tracker = LinearSplineTracker(
+		lsnake_params.border_clue,
+		lsnake_params.max_distance,
+		lsnake_params.min_distance,
+		lsnake_params.min_angle,
+		lsnake_params.rings);
+	
 	int nframe = 0;
 	int ndiff = 0;
 	for (;;)
@@ -208,9 +242,9 @@ int main(int argc, const char* argv[])
 		// Read frame in original video
 		if (!d_reader->nextFrame(d_frame))
 			break;
-		cv::imshow("GPU", d_frame);
 
-		cv::cuda::cvtColor(d_frame, d_blur, CV_BGRA2GRAY);
+		d_roi = cv::cuda::GpuMat(d_frame, roi);
+		cv::cuda::cvtColor(d_roi, d_blur, CV_BGRA2GRAY);
 		
 		median_blur->apply(d_blur, d_blur);
 #ifdef DEBUG_SHOW
@@ -235,9 +269,22 @@ int main(int argc, const char* argv[])
 		{
 			canny_edg->detect(d_blur, d_dst);
 		}
-		cv::imshow("Mod", d_dst);
-
-        if (cv::waitKey(10) == 'q')
+		//cv::imshow("Mod", d_dst);
+#ifdef DEBUG_SHOW
+		d_roi.copyTo(d_frame_edges, d_dst);
+		cv::imshow("Edges", d_frame_edges);
+#else
+		cv::imshow("Edges", d_dst);
+#endif		
+		d_roi.copyTo(d_frame_view);
+		lspline_tracker.track(d_roi, d_dst, d_frame_view);
+		cv::imshow("GPU", d_frame);
+		cv::imshow("Mod", d_frame_view);
+#ifdef DEBUG_SHOW
+		d_frame_edges.setTo(cv::Scalar(0));
+#endif
+		
+        if (cv::waitKey(-1) == 'q')
 			break;
 
 	}

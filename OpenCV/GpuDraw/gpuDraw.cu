@@ -11,8 +11,8 @@
 inline void gpuAssert(cudaError_t code, const char *file, const char *func, int line, bool abort = true)
 {    
     if (code != cudaSuccess) {
-	fprintf(stderr, "\e[1;31mGPUassert: %s %s %s %d\n\e[1;0m", cudaGetErrorString(code), file, func, line);
-	if (abort) exit(code);
+		fprintf(stderr, "\e[1;31mGPUassert: %s %s %s %d\n\e[1;0m", cudaGetErrorString(code), file, func, line);
+		if (abort) exit(code);
     }
 }
 

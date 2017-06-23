@@ -1,5 +1,7 @@
 __pycache__
 .idea
+.cproject
+.project
 nbproject
 error_plot.png
 logs/
