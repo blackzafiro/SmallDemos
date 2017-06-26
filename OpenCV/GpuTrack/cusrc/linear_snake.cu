@@ -9,6 +9,14 @@
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 
 #define CPH_INITIAL_LENGHT		20	// Initial capacity of array of control points.
 #define CONTOUR_INITIAL_LENGTH	100	// Initial estimate of the number of control points that will appear.
@@ -170,7 +178,7 @@ class ContourHistory{
 private:
 	ControlPointHistory** d_control_point_history;	// Array of pointers to created histories.
 	unsigned int end;
-	unsigned int capacity;
+	int capacity;
 
 	int time_step;
 
@@ -197,13 +205,23 @@ public:
 	{
 		int num_elems = (initial_length > CONTOUR_INITIAL_LENGTH) ? initial_length : CONTOUR_INITIAL_LENGTH;
 
-		cudaError_t code = cudaMalloc((void**) &d_control_point_history, sizeof (ControlPointHistory*)  * num_elems);
+		cudaError_t code = cudaMalloc((void**) &d_control_point_history, sizeof (ControlPointHistory*) * num_elems);
 		if (code != cudaSuccess) {
-			num_elems = -1;
+			capacity = -1;
 			return;
 		}
 
 		capacity = num_elems;
+		printf(ANSI_COLOR_MAGENTA	"Array of pointers in 0x%08x"	ANSI_COLOR_RESET "\n", d_control_point_history);
+		printf(ANSI_COLOR_MAGENTA	"Array of pointers size %d"		ANSI_COLOR_RESET "\n", sizeof (ControlPointHistory*) * num_elems);
+	}
+
+	/**
+	 * Used to verify if memory allocation was successful.
+	 */
+	__device__
+	int getCapacity() {
+		return capacity;
 	}
 
 	/**
@@ -233,11 +251,11 @@ public:
 	__device__
 	void createControlPointHistory(ControlPoint &cpoint, int index)
 	{
-		//ControlPoint* h_point = new ControlPoint(cpoint);
-		//d_control_point_history[index] = d_control_point_history;
+		// TODO: Useless, the array died between kernel calls.
 		ControlPointHistory* d_cph = new ControlPointHistory(this->time_step);
 		d_cph->queue(cpoint);
-		d_control_point_history[index] = d_cph;
+		printf(ANSI_COLOR_MAGENTA "Array of pointer %d in 0x%08x"	ANSI_COLOR_RESET "\n", index, d_control_point_history);
+		*(d_control_point_history + index * sizeof(ControlPointHistory*)) = d_cph;
 	}
 
 	__device__
@@ -264,6 +282,10 @@ __global__
 void createTracker(ContourHistory* d_contour_history, int minimum_length)
 {
 	d_contour_history = new ContourHistory(minimum_length);
+	if (d_contour_history->getCapacity() == -1)
+	{
+		d_contour_history = NULL;
+	}
 }
 
 /**
@@ -273,7 +295,7 @@ void createTracker(ContourHistory* d_contour_history, int minimum_length)
 __global__
 void initTracker(ContourHistory* d_contour_history, unsigned int* d_contour_history_length, ControlPoint* d_point_array, int length)
 {
-	int index = blockIdx.x *blockDim.x + threadIdx.x;
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	d_contour_history->createControlPointHistory(d_point_array[index], index);
 
@@ -328,6 +350,7 @@ private:
 	
 	// +++ Auxiliary variables
 	int _max_threads;
+	bool _broken;
 
 	unsigned int _contour_history_length;
 	unsigned int* d_contour_history_length;
@@ -337,7 +360,7 @@ private:
 	/**
 	 * Add the points in border_clue to the contour history tracking structure.
 	 */
-	void initBorder(std::vector<cv::Point>& border_clue)
+	int initBorder(std::vector<cv::Point>& border_clue)
 	{
 		const int length = border_clue.size();
 
@@ -347,6 +370,12 @@ private:
 
 		createTracker <<< 1, 1 >>> (d_contour_history, length);
 		gpuErrchk( cudaPeekAtLastError() );
+
+		if (d_contour_history == NULL)
+		{
+			std::cerr << "Failed to create history of control points." << std::endl;
+			return -1;
+		}
 
 
 		std::cout << "Number of control points to add for initialization: \t" << length << std::endl;
@@ -382,11 +411,13 @@ private:
 		// free device temporary storage of control points.
 		cudaFree(d_point_array);
 		std::cout << "Number of control points in history after [init]\t" << _contour_history_length << std::endl;
+
+		return 0;
 	}
 
 public:
 	LinearSplineTrackerImpl(std::vector<cv::Point>& border_clue, int max_distance, int min_distance, int min_angle, int rings) :
-	max_distance(max_distance), min_distance(min_distance), min_angle(min_angle), rings(rings), _contour_history_length (0)
+	max_distance(max_distance), min_distance(min_distance), min_angle(min_angle), rings(rings), _contour_history_length (0), _broken(false)
 	{
 		struct cudaDeviceProp properties;
 		cudaGetDeviceProperties(&properties, 0);	// Assuming device 0:
@@ -395,11 +426,16 @@ public:
 		gpuErrchk( cudaMalloc((void **) &d_contour_history_length, sizeof(unsigned int)) );
 		gpuErrchk( cudaMalloc((void **) &d_contour_history, sizeof(ContourHistory*)) );
 
-		initBorder(border_clue);
+		if (initBorder(border_clue) < 0)
+		{
+			_broken = true;
+		}
 	}
 
 	void track(cv::cuda::GpuMat d_img, cv::cuda::GpuMat d_edges, cv::cuda::GpuMat d_draw)
 	{
+		if(_broken) return;
+
 		std::cout << "Number of control points in history before\t" << _contour_history_length << std::endl;
 
 		gpuErrchk( cudaMemcpy((void*) d_contour_history_length, (const void*)&_contour_history_length, sizeof(unsigned int), cudaMemcpyHostToDevice) );
