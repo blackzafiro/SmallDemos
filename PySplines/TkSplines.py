@@ -1,5 +1,5 @@
 """
-Plots cubic splines.
+Plots splines.
 """
 import matplotlib
 matplotlib.use('TkAgg')
@@ -22,10 +22,11 @@ class Spline:
     """
     def __init__(self, n = 3):
         self.n = n
-        self.k = 5    # Knots
-        self.beta_oj = np.array([1, -2, 1, 3])      # len = n + 1
-        self.beta_in = np.array([[-1, 1, -20, 3, -2]])  # len = k
-        self.ti = np.array([50, 100, 200, 300, 350])       # len = k
+        self.k = 5                                         # Knots
+        self.beta_oj = np.array([1, -2, 1, 3])            # len = n + 1
+        #self.beta_oj = np.array([1, -2, 0, 0])            # for a restricted cubic spline on the left side
+        self.beta_in = np.array([[-100, 1, -200, 3, -2]])     # len = k
+        self.ti = np.array([50, 150, 200, 300, 350])       # len = k
 
         self.fig = plt.figure()
         self.plot()
