@@ -1,0 +1,33 @@
+<html>
+<head>
+  <title>Restricted cubic spline</title>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-MML-AM_CHTML' async></script>
+</head>
+<body>
+<h1>Restricted cubic spline</h1>
+<p>
+  For a cubic spline,  \(K\) knots are placed at \(t_1 < t_2 < ... < t_K \). Let
+  $$ u_+ = \begin{cases}
+            u & \text{if } u > 0, \\
+            0 & \text{if } u <= 0
+           \end{cases} $$
+</p>
+<p>
+From the continuous variable \( x \) a set of \( (K-2) \) new variables are created:
+$$x_i = (x - t_i)^3_+ - (x - t_{K-1})^3_+ \frac{t_K - t_i}{t_K - t_{K-1}} + (x - t_K)^3_+ \frac{t_{K-1} - t_i}{t_K - t_{K-1}}, i = 1,...,K-2 $$
+so that
+$$ x_i = \begin{cases}
+           0            & \text{if } x <= t_i, \\
+           (x - t_i)^3  & \text{if } t_i < x <= t_{K-1}, \\
+           (x - t_{K-1})^3 \frac{t_K - t_i}{t_K - t_{K-1}} + (x - t_K)^3 \frac{t_{K-1} - t_i}{t_K - t_{K-1}}             & \text{if } t_{K-1} < x <= t_K, \\
+           0            & \text{if } t_K < x
+         \end{cases} $$ 
+</p>
+<p>
+Then
+$$S(x) = \beta_{00} + \beta_{01}x + \sum_{i=1}^{K-2}\beta_{i3}x_i$$
+</p>
+<a href="https://doi.org/10.1002/sim.4780080504">Flexible regression models with cubic splines</a>
+</body>
+</html>
+
