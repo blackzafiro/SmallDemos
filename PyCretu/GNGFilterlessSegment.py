@@ -46,8 +46,9 @@ param_suits = {
     'sponge_set_2': {'file_video': 'data/original/sponge_longside_100.mp4',
                      'roi': ((270, 200), (800, 700)),
                      'file_dst_video': 'data/generated_videos/sponge_longside_100__filterless_segmented.avi',
-                     'file_segment_gng': 'data/pickles/luv_5charac_segment_gng_scentre.pickle',
-                     'color_space': cv2.COLOR_BGR2Luv},
+                     'file_segment_gng': 'data/pickles/luv_1charac_segment_gng_scentre.pickle',
+                     'color_space': cv2.COLOR_BGR2Luv,
+                     'feature_indices':[1]},
     'sponge_set_3': {'file_video': 'data/original/sponge_shortside_100.mp4',
                      'roi': ((375, 150), (850, 675)),
                      'file_dst_video': 'data/generated_videos/sponge_shortside_100__filterless_segmented.avi',
@@ -250,9 +251,11 @@ if __name__ == '__main__':
         if sys.argv[1] in param_suits:
             param_suit = param_suits[sys.argv[1]]
             cap = cv2.VideoCapture(param_suit['file_video'])
+            print("  ", sys.argv[1], " param suit recognized")
         else:
             param_suit = param_suit['default']
             cap = cv2.VideoCapture(sys.argv[1])
+            print("  Using default param suit")
     else:
         print('Usage: ' + sys.argv[0] + ' <param_suit>')
         print('param_suit may be one of:')

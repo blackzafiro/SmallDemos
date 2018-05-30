@@ -489,7 +489,7 @@ def calibrateSegmentationGNG(hsv, segment_params):
     errors = []
     step = 0
     # Repeat n times
-    for i in range(0, segment_params['px_cicles']):
+    for i in range(0, px_cicles):
         pbar.set_progress(0)
         for yrow in range(0, shape[0]):
             for xcol in range(0, shape[1]):
